@@ -1,0 +1,9 @@
+.DS_Store
+.tools/
+.build/
+build/
+DerivedData/
+NotionDashboard.dmg
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/

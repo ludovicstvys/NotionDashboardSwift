@@ -1,0 +1,73 @@
+{
+  "config": {
+    "bdfApiKey": "",
+    "externalIcalUrl": "",
+    "focusModeEnabled": false,
+    "googleAccessToken": "",
+    "googleDefaultCalendarID": "",
+    "googleOAuthClientID": "608348086080-dp8647muci5st4em00pdgvrba75jq3db.apps.googleusercontent.com",
+    "googleOAuthRedirectURI": "com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db:/oauth2redirect",
+    "googleOAuthScopes": [
+      "https://www.googleapis.com/auth/calendar.readonly",
+      "https://www.googleapis.com/auth/calendar.events"
+    ],
+    "googlePlacesApiKey": "",
+    "googleRefreshToken": "",
+    "googleSelectedCalendarIDs": [],
+    "googleTokenExpiration": null,
+    "marketSymbols": [
+      "^GSPC",
+      "EURUSD=X",
+      "BTC-USD"
+    ],
+    "marketsEnabled": true,
+    "newsEnabled": true,
+    "notionDbId": "",
+    "notionFieldMap": {
+      "closeDate": "Date de fermeture",
+      "company": "Entreprise",
+      "jobTitle": "Job Title",
+      "location": "Lieu",
+      "notes": "Notes",
+      "status": "Status",
+      "url": "lien offre"
+    },
+    "notionStatusMap": {
+      "applied": "Candidature",
+      "interview": "Entretien",
+      "open": "Ouvert",
+      "rejected": "Refuse"
+    },
+    "notionTodoDbId": "",
+    "notionToken": "",
+    "pipelineAutoImportEnabled": true,
+    "pomodoroBreakMinutes": 5,
+    "pomodoroWorkMinutes": 25,
+    "reminderPrefs": {
+      "deadlineMinutes": [
+        1440,
+        60
+      ],
+      "defaultMinutes": [
+        30
+      ],
+      "interviewMinutes": [
+        120,
+        30
+      ],
+      "meetingMinutes": [
+        30
+      ]
+    },
+    "urlBlockerRules": [],
+    "wipLimits": {
+      "applied": 15,
+      "interview": 8,
+      "open": 20,
+      "rejected": 999
+    }
+  },
+  "exportedAt": "2026-03-29T00:00:00Z",
+  "format": "notion-dashboard-swift-connections-v1",
+  "includesSensitiveData": false
+}

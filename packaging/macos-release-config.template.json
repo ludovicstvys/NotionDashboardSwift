@@ -1,0 +1,11 @@
+{
+  "appleTeamId": "ABCDE12345",
+  "appleCodesignIdentity": "Developer ID Application: Your Name (ABCDE12345)",
+  "developerIdCertificateP12Base64": "BASE64_ENCODED_P12",
+  "developerIdCertificatePassword": "P12_PASSWORD",
+  "appleNotaryKeyId": "ABC123DEFG",
+  "appleNotaryIssuerId": "00000000-0000-0000-0000-000000000000",
+  "appleNotaryApiKeyP8Base64": "BASE64_ENCODED_APP_STORE_CONNECT_P8",
+  "sparklePublicEdKey": "SPARKLE_PUBLIC_ED_KEY",
+  "sparklePrivateEdKey": "SPARKLE_PRIVATE_ED_KEY"
+}

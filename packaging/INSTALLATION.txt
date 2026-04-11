@@ -1,0 +1,22 @@
+Dashboard - installation package contents
+
+This DMG contains:
+- Dashboard.app
+- Connections/connections-config.template.txt
+- Applications shortcut
+
+Install the macOS app:
+1. Drag Dashboard.app to Applications.
+2. If macOS blocks first launch, run:
+   xattr -cr /Applications/Dashboard.app
+
+Import the app connections template:
+1. Open the macOS app
+2. Go to Settings
+3. In "Import / Export connections", click "Import file"
+4. Choose Connections/connections-config.template.txt
+5. Fill in your real tokens, IDs, API keys, calendar URLs, and mappings
+
+Security note:
+- The connections template can contain sensitive values.
+- Do not distribute a filled package unless you intend to share those secrets.
