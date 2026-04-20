@@ -335,6 +335,7 @@ final class UpdateStore: NSObject, ObservableObject {
   }
 
   private func handleCheckError(_ error: Error?) {
+#if os(macOS)
     refreshFromUpdater()
 
     guard let error else {
@@ -360,6 +361,15 @@ final class UpdateStore: NSObject, ObservableObject {
       message: "Sparkle cycle finished with an error.",
       metadata: ["error": nsError.localizedDescription]
     )
+#else
+    if let error {
+      lastErrorMessage = error.localizedDescription
+      state = .error
+    } else {
+      lastErrorMessage = UpdateStoreError.unsupportedPlatform.localizedDescription
+      state = .idle
+    }
+#endif
   }
 
   private static func intervalLabel(for interval: TimeInterval) -> String {

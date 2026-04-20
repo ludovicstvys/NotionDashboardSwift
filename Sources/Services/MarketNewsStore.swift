@@ -23,6 +23,10 @@ final class MarketNewsStore: ObservableObject {
   private let decoder: JSONDecoder
   private let newsService: NewsService
   private let marketService: MarketService
+  private let persistenceScheduler = DebouncedWorkScheduler(
+    label: "com.loldashboard.notiondashboard.market-news-persist",
+    delay: 0.2
+  )
   private weak var configStore: ConfigStore?
   private weak var diagnostics: DiagnosticsStore?
   private var isRefreshing = false
@@ -214,7 +218,17 @@ final class MarketNewsStore: ObservableObject {
       quotes: quotes,
       lastRefreshDate: lastRefreshDate
     )
-    guard let data = try? encoder.encode(snapshot) else { return }
-    defaults.set(data, forKey: cacheStorageKey)
+    let defaults = self.defaults
+    let cacheStorageKey = self.cacheStorageKey
+    persistenceScheduler.schedule {
+      let start = CFAbsoluteTimeGetCurrent()
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      encoder.dateEncodingStrategy = .iso8601
+      guard let data = try? encoder.encode(snapshot) else { return }
+      defaults.set(data, forKey: cacheStorageKey)
+      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+      PerformanceMonitor.recordPersistence(label: "MarketNewsStore.persistCache", durationMs: durationMs)
+    }
   }
 }

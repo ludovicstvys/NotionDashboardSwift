@@ -7,6 +7,7 @@ struct NotionDashboardApp: App {
   var body: some Scene {
     WindowGroup {
       RootView()
+        .environmentObject(container.appRouter)
         .environmentObject(container.diagnosticsStore)
         .environmentObject(container.configStore)
         .environmentObject(container.updateStore)
@@ -16,6 +17,12 @@ struct NotionDashboardApp: App {
         .environmentObject(container.stageStore)
         .environmentObject(container.calendarStore)
         .environmentObject(container.marketNewsStore)
+        .environmentObject(container.dashboardViewModel)
+        .environmentObject(container.stagesViewModel)
+        .environmentObject(container.calendarViewModel)
+        .onOpenURL { url in
+          container.appRouter.handle(url: url)
+        }
     }
 #if os(macOS)
     .commands {

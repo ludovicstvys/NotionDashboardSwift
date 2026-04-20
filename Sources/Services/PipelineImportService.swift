@@ -4,6 +4,9 @@ enum PipelineImportError: LocalizedError {
   case unsupportedSource
   case invalidURL
   case fetchFailed
+  case loginRequired
+  case challengeDetected
+  case javascriptRenderedPage
   case parseFailed
 
   var errorDescription: String? {
@@ -14,8 +17,14 @@ enum PipelineImportError: LocalizedError {
       return "Invalid URL."
     case .fetchFailed:
       return "Unable to fetch source page."
+    case .loginRequired:
+      return "This page requires login. Import is only supported for publicly accessible postings."
+    case .challengeDetected:
+      return "This page is protected by a challenge or anti-bot check. Import is not supported for this page."
+    case .javascriptRenderedPage:
+      return "This page loads the job content with JavaScript only. Import is not supported for this page."
     case .parseFailed:
-      return "Unable to parse job posting data."
+      return "Unable to parse this job posting page."
     }
   }
 }
@@ -46,6 +55,10 @@ struct PipelineImportService {
       throw PipelineImportError.fetchFailed
     }
 
+    if let pageIssue = detectUnsupportedPageIssue(html: html) {
+      throw pageIssue
+    }
+
     if let parsed = parseJSONLD(html: html, sourceURL: clean) {
       return parsed
     }
@@ -55,6 +68,47 @@ struct PipelineImportService {
     }
 
     throw PipelineImportError.parseFailed
+  }
+
+  private func detectUnsupportedPageIssue(html: String) -> PipelineImportError? {
+    let normalized = html.lowercased()
+
+    let loginMarkers = [
+      "sign in to view",
+      "connectez-vous pour",
+      "login required",
+      "please sign in",
+      "authwall",
+    ]
+    if loginMarkers.contains(where: normalized.contains) {
+      return .loginRequired
+    }
+
+    let challengeMarkers = [
+      "cf-challenge",
+      "captcha",
+      "security check",
+      "bot verification",
+      "verify you are human",
+      "challenge-platform",
+    ]
+    if challengeMarkers.contains(where: normalized.contains) {
+      return .challengeDetected
+    }
+
+    let jsOnlyMarkers = [
+      "__next_data__",
+      "id=\"__next\"",
+      "data-reactroot",
+      "window.__apollo_state__",
+      "enable javascript",
+    ]
+    let hasStructuredJobData = normalized.contains("jobposting") || normalized.contains("og:title")
+    if jsOnlyMarkers.contains(where: normalized.contains), !hasStructuredJobData {
+      return .javascriptRenderedPage
+    }
+
+    return nil
   }
 
   private func parseJSONLD(html: String, sourceURL: String) -> PipelineImportPreview? {

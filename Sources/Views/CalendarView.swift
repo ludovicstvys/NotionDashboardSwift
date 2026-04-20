@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CalendarView: View {
+  @EnvironmentObject private var appRouter: AppRouter
+  @EnvironmentObject private var calendarViewModel: CalendarViewModel
   @EnvironmentObject private var calendarStore: CalendarStore
   @EnvironmentObject private var configStore: ConfigStore
   @EnvironmentObject private var googleAuthStore: GoogleAuthStore
@@ -11,25 +13,38 @@ struct CalendarView: View {
 
   var body: some View {
     NavigationStack {
-      GeometryReader { proxy in
-        ScrollView {
-          VStack(alignment: .leading, spacing: 24) {
-            heroPanel(width: proxy.size.width)
-            actionBar
-            connectionPanel
-            eventFeedPanel
+      ScrollViewReader { scrollProxy in
+        GeometryReader { proxy in
+          let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+              heroPanel(width: proxy.size.width, metrics: metrics)
+              actionBar
+              connectionPanel
+              eventFeedPanel
+            }
+            .padding(.horizontal, metrics.horizontalPadding)
+            .padding(.vertical, metrics.regularPanelPadding)
+            .frame(maxWidth: metrics.contentMaxWidth)
+            .frame(maxWidth: .infinity, alignment: .top)
           }
-          .padding(.horizontal, horizontalPadding(for: proxy.size.width))
-          .padding(.vertical, 28)
-          .frame(maxWidth: 1_440)
-          .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .onAppear {
+          focusTargetEvent(using: scrollProxy)
+        }
+        .onChange(of: appRouter.route.nonce) { _ in
+          focusTargetEvent(using: scrollProxy)
+        }
+        .onChange(of: calendarViewModel.state.groupedEvents.count) { _ in
+          focusTargetEvent(using: scrollProxy)
         }
       }
-      .background(WorkspaceBackground())
+      .background(WorkspaceBackground().equatable())
       .navigationTitle("Calendar")
-      .animation(.snappy(duration: 0.26), value: calendarStore.events.count)
-      .animation(.snappy(duration: 0.26), value: calendarStore.googleCalendars.count)
+      .safeAreaInset(edge: .bottom) {
+        FooterMessageHost(message: footerMessage)
       }
+    }
     .task(priority: .utility) {
       if iCalURL.isEmpty {
         iCalURL = configStore.config.externalIcalUrl
@@ -56,12 +71,13 @@ struct CalendarView: View {
         }
       }
     }
+    .instrumentedScreen("CalendarView")
   }
 
   private var actionBar: some View {
     WorkspaceCommandBar(
-      title: "Flow",
-      subtitle: "Keep source refresh, calendar loading, and event creation close to the feed."
+      title: "Calendar",
+      subtitle: "Refresh sources, reconnect accounts, and create events from a single control bar."
     ) {
       Button {
         Task {
@@ -72,7 +88,7 @@ struct CalendarView: View {
         Label("Refresh feed", systemImage: "arrow.clockwise")
       }
       .buttonStyle(.borderedProminent)
-      .tint(.teal)
+      .tint(WorkspacePalette.accent)
 
       Button {
         Task { await googleAuthStore.signInInteractive() }
@@ -88,26 +104,26 @@ struct CalendarView: View {
       }
       .buttonStyle(.bordered)
 
-      WorkspaceBadge(text: "\(groupedEvents.count) days", tint: .blue)
+      WorkspaceBadge(text: "\(calendarViewModel.state.groupedEvents.count) days", tint: WorkspacePalette.accentSoft)
     }
   }
 
-  private func heroPanel(width: CGFloat) -> some View {
-    WorkspacePanel(tint: .teal, padding: width >= 900 ? 28 : 22) {
+  private func heroPanel(width: CGFloat, metrics: WorkspaceLayoutMetrics) -> some View {
+    WorkspacePanel(tint: WorkspacePalette.accent, padding: metrics.regularPanelPadding) {
       VStack(alignment: .leading, spacing: 22) {
         HStack(alignment: .top, spacing: 20) {
           VStack(alignment: .leading, spacing: 12) {
-            Text("CALENDAR CONTROL")
+            Text("CALENDAR")
               .font(.caption2.weight(.bold))
-              .tracking(2.4)
+              .tracking(1.8)
               .foregroundStyle(Color.white.opacity(0.70))
 
-            Text("Connections, reminders,\nand event flow.")
-              .font(.system(size: width >= 1_120 ? 44 : 36, weight: .bold, design: .serif))
+            Text("Events, sources,\nand timing.")
+              .font(.system(size: width >= 1_120 ? 42 : 34, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
               .fixedSize(horizontal: false, vertical: true)
 
-            Text("Calendar now follows the same language as Home: connection state first, then the events that matter, grouped by day and easier to scan.")
+            Text("The calendar page is now cleaner and more operational: source state first, then the upcoming timeline grouped by day.")
               .font(.subheadline)
               .foregroundStyle(Color.white.opacity(0.72))
               .fixedSize(horizontal: false, vertical: true)
@@ -116,16 +132,16 @@ struct CalendarView: View {
           Spacer(minLength: 0)
 
           VStack(alignment: .trailing, spacing: 10) {
-            WorkspaceBadge(text: googleAuthStore.isAuthenticated ? "Google live" : "Google off", tint: googleAuthStore.isAuthenticated ? .green : .orange)
-            WorkspaceBadge(text: notificationStatusText, tint: .pink)
+            WorkspaceBadge(text: googleAuthStore.isAuthenticated ? "Google connected" : "Google offline", tint: googleAuthStore.isAuthenticated ? WorkspacePalette.success : WorkspacePalette.warning)
+            WorkspaceBadge(text: notificationStatusText, tint: .white)
           }
         }
 
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
-          calendarMetric(title: "Upcoming", value: "\(upcomingCount)", detail: "next items ahead", tint: .teal)
-          calendarMetric(title: "Today", value: "\(todayCount)", detail: "scheduled today", tint: .blue)
-          calendarMetric(title: "Sources", value: "\(sourceCount)", detail: sourceCount == 0 ? "none connected" : "active feeds", tint: .orange)
-          calendarMetric(title: "Alerts", value: notificationCountLabel, detail: "notification permission", tint: .pink)
+          calendarMetric(title: "Upcoming", value: "\(calendarViewModel.state.upcomingCount)", detail: "next items ahead", tint: WorkspacePalette.accent)
+          calendarMetric(title: "Today", value: "\(calendarViewModel.state.todayCount)", detail: "scheduled today", tint: WorkspacePalette.accentSoft)
+          calendarMetric(title: "Sources", value: "\(sourceCount)", detail: sourceCount == 0 ? "none connected" : "active feeds", tint: WorkspacePalette.warning)
+          calendarMetric(title: "Alerts", value: notificationCountLabel, detail: "notification permission", tint: .white)
         }
       }
     }
@@ -133,9 +149,9 @@ struct CalendarView: View {
 
   private var connectionPanel: some View {
     WorkspacePanel(
-      title: "Connections and actions",
-      subtitle: "Google auth, calendar filtering, reminder authorization, and iCal loading live in the same control surface.",
-      tint: .orange
+      title: "Connections and sources",
+      subtitle: "Manage Google auth, filters, notifications, and external calendars from one place.",
+      tint: WorkspacePalette.warning
     ) {
       VStack(alignment: .leading, spacing: 18) {
         HStack(spacing: 10) {
@@ -143,10 +159,11 @@ struct CalendarView: View {
             Task { await googleAuthStore.signInInteractive() }
           }
           .buttonStyle(.borderedProminent)
-          .tint(.teal)
+          .tint(WorkspacePalette.accent)
 
           Button("Disconnect") {
             googleAuthStore.signOut()
+            Task { await calendarStore.handleGoogleSignOut(icalURL: iCalURL) }
           }
           .buttonStyle(.bordered)
           .disabled(!googleAuthStore.isAuthenticated)
@@ -176,7 +193,7 @@ struct CalendarView: View {
               }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .tint(WorkspacePalette.warning)
 
             Button("Google only") {
               Task {
@@ -194,14 +211,20 @@ struct CalendarView: View {
               ForEach(calendarStore.googleCalendars) { cal in
                 let selected = calendarStore.selectedCalendarIDs.contains(cal.id)
                 Button {
-                  calendarStore.setCalendarSelected(calendarID: cal.id, isSelected: !selected)
+                  Task {
+                    await calendarStore.setCalendarSelected(
+                      calendarID: cal.id,
+                      isSelected: !selected,
+                      icalURL: iCalURL
+                    )
+                  }
                 } label: {
                   Text(cal.name)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(selected ? Color.teal.opacity(0.20) : Color.white.opacity(0.08))
-                    .foregroundStyle(selected ? Color.teal : Color.white.opacity(0.76))
+                    .background(selected ? WorkspacePalette.accent.opacity(0.20) : Color.white.opacity(0.08))
+                    .foregroundStyle(selected ? WorkspacePalette.accentSoft : Color.white.opacity(0.76))
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -229,44 +252,78 @@ struct CalendarView: View {
   private var eventFeedPanel: some View {
     WorkspacePanel(
       title: "Event feed",
-      subtitle: "Grouped by day, with the same visual hierarchy as the rest of the workspace.",
-      tint: .blue
+      subtitle: "A grouped timeline of what is coming next, optimized for scanning.",
+      tint: WorkspacePalette.accentSoft
     ) {
       if calendarStore.isLoading {
         ProgressView("Loading calendar events...")
           .tint(.teal)
-      } else if groupedEvents.isEmpty {
+      } else if calendarViewModel.state.groupedEvents.isEmpty {
         calendarEmptyState(
           title: "No event loaded",
           message: "Connect Google Calendar or load an external iCal source to populate the feed."
         )
       } else {
+#if os(macOS)
+        List {
+          ForEach(calendarViewModel.state.groupedEvents) { group in
+            Section {
+              ForEach(group.items) { event in
+                CalendarEventRow(event: event, isHighlighted: isEventHighlighted(event.id)) {
+                  selectedEvent = event
+                }
+                .equatable()
+                .id(eventRowID(event.id))
+                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+              }
+            } header: {
+              HStack {
+                Text(group.day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                  .font(.headline)
+                  .foregroundStyle(.white)
+                Spacer()
+                WorkspaceBadge(text: "\(group.items.count)", tint: WorkspacePalette.accentSoft)
+              }
+              .padding(.top, 6)
+            }
+          }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .frame(minHeight: 520)
+#else
         LazyVStack(spacing: 18) {
-          ForEach(groupedEvents, id: \.day) { group in
+          ForEach(calendarViewModel.state.groupedEvents) { group in
             VStack(alignment: .leading, spacing: 12) {
               HStack {
                 Text(group.day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                   .font(.headline)
                   .foregroundStyle(.white)
                 Spacer()
-                WorkspaceBadge(text: "\(group.items.count)", tint: .blue)
+                WorkspaceBadge(text: "\(group.items.count)", tint: WorkspacePalette.accentSoft)
               }
 
               VStack(spacing: 12) {
                 ForEach(group.items) { event in
-                  CalendarEventRow(event: event) {
+                  CalendarEventRow(event: event, isHighlighted: isEventHighlighted(event.id)) {
                     selectedEvent = event
                   }
+                  .equatable()
+                  .id(eventRowID(event.id))
                 }
               }
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .workspaceInteractiveSurface(cornerRadius: 24, tint: .blue, raised: false)
+            .workspaceInteractiveSurface(cornerRadius: 24, tint: WorkspacePalette.accentSoft, raised: false)
           }
         }
+#endif
       }
     }
+    .id("calendar-event-feed")
   }
 
   private func calendarMetric(title: String, value: String, detail: String, tint: Color) -> some View {
@@ -274,31 +331,7 @@ struct CalendarView: View {
   }
 
   private func calendarEmptyState(title: String, message: String) -> some View {
-    WorkspaceEmptyState(title: title, message: message, tint: .blue, systemImage: "calendar.badge.exclamationmark")
-  }
-
-  private func horizontalPadding(for width: CGFloat) -> CGFloat {
-    width >= 900 ? 28 : 18
-  }
-
-  private var groupedEvents: [(day: Date, items: [CalendarEvent])] {
-    let grouped = Dictionary(grouping: calendarStore.events) { event in
-      Calendar.current.startOfDay(for: event.start)
-    }
-    return grouped.keys.sorted().map { day in
-      let items = (grouped[day] ?? []).sorted { $0.start < $1.start }
-      return (day: day, items: items)
-    }
-  }
-
-  private var upcomingCount: Int {
-    let now = Date()
-    return calendarStore.events.filter { $0.end >= now }.count
-  }
-
-  private var todayCount: Int {
-    let calendar = Calendar.current
-    return calendarStore.events.filter { calendar.isDateInToday($0.start) }.count
+    WorkspaceEmptyState(title: title, message: message, tint: WorkspacePalette.accentSoft, systemImage: "calendar.badge.exclamationmark")
   }
 
   private var sourceCount: Int {
@@ -336,6 +369,40 @@ struct CalendarView: View {
     @unknown default:
       return "?"
     }
+  }
+
+  private func focusTargetEvent(using proxy: ScrollViewProxy) {
+    guard appRouter.destination == .calendar else { return }
+    guard let eventID = appRouter.route.eventID else { return }
+
+    if let event = calendarViewModel.event(id: eventID) {
+      withAnimation(.snappy(duration: 0.26)) {
+        proxy.scrollTo(eventRowID(eventID), anchor: .center)
+      }
+      selectedEvent = event
+    } else {
+      withAnimation(.snappy(duration: 0.26)) {
+        proxy.scrollTo("calendar-event-feed", anchor: .top)
+      }
+    }
+  }
+
+  private func isEventHighlighted(_ eventID: String) -> Bool {
+    appRouter.destination == .calendar && appRouter.route.eventID == eventID
+  }
+
+  private func eventRowID(_ eventID: String) -> String {
+    "calendar-event-\(eventID)"
+  }
+
+  private var footerMessage: String? {
+    if !calendarStore.statusMessage.isEmpty {
+      return calendarStore.statusMessage
+    }
+    if !googleAuthStore.statusMessage.isEmpty {
+      return googleAuthStore.statusMessage
+    }
+    return nil
   }
 }
 
@@ -377,14 +444,80 @@ struct CreateGoogleEventSheet: View {
   }
 }
 
-struct CalendarEventRow: View {
+struct CalendarEventRow: View, Equatable {
   let event: CalendarEvent
+  let isHighlighted: Bool
   let onShowDetails: () -> Void
-  @Environment(\.openURL) private var openURL
-  @EnvironmentObject private var focusStore: FocusStore
-  @State private var blockedMessage: String = ""
+
+  static func == (lhs: CalendarEventRow, rhs: CalendarEventRow) -> Bool {
+    lhs.event == rhs.event && lhs.isHighlighted == rhs.isHighlighted
+  }
 
   var body: some View {
+#if os(macOS)
+    HStack(alignment: .top, spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text(event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()))
+          .font(.system(size: 16, weight: .bold, design: .rounded))
+          .foregroundStyle(.white)
+        Text(event.end.formatted(.dateTime.hour().minute()))
+          .font(.caption2)
+          .foregroundStyle(Color.white.opacity(0.58))
+      }
+      .frame(width: 64, alignment: .leading)
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+          Text(event.summary.isEmpty ? "Event" : event.summary)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(2)
+
+          Spacer(minLength: 8)
+
+          Circle()
+            .fill(eventTypeColor(for: event.eventType))
+            .frame(width: 8, height: 8)
+        }
+
+        Text(event.whenText)
+          .font(.caption)
+          .foregroundStyle(Color.white.opacity(0.68))
+          .lineLimit(1)
+
+        HStack(spacing: 8) {
+          if !event.calendarName.isEmpty {
+            Text(event.calendarName)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(Color.teal)
+              .lineLimit(1)
+          }
+          if !event.location.isEmpty {
+            Text(event.location)
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(Color.white.opacity(0.62))
+              .lineLimit(1)
+          }
+        }
+      }
+
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .background(
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .fill(WorkspacePalette.panelBase.opacity(0.58))
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .stroke(isHighlighted ? Color.white.opacity(0.18) : Color.white.opacity(0.06), lineWidth: 1)
+    )
+    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .onTapGesture {
+      onShowDetails()
+    }
+#else
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .top, spacing: 12) {
         VStack(alignment: .leading, spacing: 4) {
@@ -424,19 +557,7 @@ struct CalendarEventRow: View {
 
       HStack(spacing: 8) {
         if !event.sourceUrl.isEmpty {
-          Button {
-            guard let url = URL(string: event.sourceUrl) else { return }
-            if focusStore.isBlocked(url: url) {
-              blockedMessage = focusStore.blockedReason(for: url)
-              return
-            }
-            openURL(url)
-          } label: {
-            Label("Open", systemImage: "link")
-          }
-          .font(.caption.weight(.semibold))
-          .buttonStyle(.bordered)
-          .tint(.teal)
+          ProtectedLinkButton(title: "Open", systemImage: "link", urlString: event.sourceUrl, tint: .teal)
         }
 
         Button("Details") {
@@ -448,11 +569,11 @@ struct CalendarEventRow: View {
     }
     .padding(18)
     .workspaceInteractiveSurface(cornerRadius: 22, tint: eventTypeColor(for: event.eventType))
-    .alert("Blocked", isPresented: Binding(get: { !blockedMessage.isEmpty }, set: { if !$0 { blockedMessage = "" } })) {
-      Button("OK", role: .cancel) { blockedMessage = "" }
-    } message: {
-      Text(blockedMessage)
+    .overlay {
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .stroke(isHighlighted ? Color.white : Color.clear, lineWidth: 2)
     }
+#endif
   }
 
   private func eventChip(text: String, tint: Color, usesNeutralStyle: Bool = false) -> some View {
@@ -469,13 +590,13 @@ struct CalendarEventRow: View {
   private func eventTypeColor(for type: EventType) -> Color {
     switch type {
     case .meeting:
-      return .teal
+      return WorkspacePalette.accent
     case .interview:
-      return .orange
+      return WorkspacePalette.warning
     case .deadline:
       return .red
     case .defaultType:
-      return .blue
+      return WorkspacePalette.accentSoft
     }
   }
 
@@ -495,9 +616,6 @@ struct CalendarEventRow: View {
 
 struct CalendarEventDetailView: View {
   let event: CalendarEvent
-  @Environment(\.openURL) private var openURL
-  @EnvironmentObject private var focusStore: FocusStore
-  @State private var blockedMessage: String = ""
 
   var body: some View {
     ScrollView {
@@ -512,39 +630,17 @@ struct CalendarEventDetailView: View {
 
         HStack(spacing: 8) {
           if !event.sourceUrl.isEmpty {
-            Button("Open source") {
-              guard let url = URL(string: event.sourceUrl) else { return }
-              if focusStore.isBlocked(url: url) {
-                blockedMessage = focusStore.blockedReason(for: url)
-                return
-              }
-              openURL(url)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
+            ProtectedLinkButton(title: "Open source", systemImage: "link", urlString: event.sourceUrl, tint: .teal)
           }
           if !event.meetingLink.isEmpty {
-            Button("Open meeting") {
-              guard let url = URL(string: event.meetingLink) else { return }
-              if focusStore.isBlocked(url: url) {
-                blockedMessage = focusStore.blockedReason(for: url)
-                return
-              }
-              openURL(url)
-            }
-            .buttonStyle(.bordered)
+            ProtectedLinkButton(title: "Open meeting", systemImage: "link", urlString: event.meetingLink, tint: .white)
           }
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(18)
     }
-    .background(WorkspaceBackground())
-    .alert("Blocked", isPresented: Binding(get: { !blockedMessage.isEmpty }, set: { if !$0 { blockedMessage = "" } })) {
-      Button("OK", role: .cancel) { blockedMessage = "" }
-    } message: {
-      Text(blockedMessage)
-    }
+    .background(WorkspaceBackground().equatable())
   }
 
   private func row(_ title: String, _ value: String) -> some View {

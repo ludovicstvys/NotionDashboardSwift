@@ -30,6 +30,14 @@
 				<string>com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>notiondashboard.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>notiondashboard</string>
+			</array>
+		</dict>
 	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>

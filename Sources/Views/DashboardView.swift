@@ -1,44 +1,52 @@
 import SwiftUI
 
 struct DashboardView: View {
+  @EnvironmentObject private var appRouter: AppRouter
+  @EnvironmentObject private var dashboardViewModel: DashboardViewModel
   @EnvironmentObject private var stageStore: StageStore
   @EnvironmentObject private var marketNewsStore: MarketNewsStore
-  @EnvironmentObject private var focusStore: FocusStore
   @EnvironmentObject private var calendarStore: CalendarStore
   @EnvironmentObject private var configStore: ConfigStore
   @EnvironmentObject private var googleAuthStore: GoogleAuthStore
-  @Environment(\.openURL) private var openURL
 
-  @State private var blockedMessage: String = ""
   @State private var selectedEvent: CalendarEvent?
-
-  private let splitBoardThreshold: CGFloat = 1_040
-  private let supportGridThreshold: CGFloat = 1_240
 
   var body: some View {
     NavigationStack {
-      GeometryReader { proxy in
-        ScrollView {
-          VStack(alignment: .leading, spacing: 24) {
-            mastheadPanel(width: proxy.size.width)
-            homeCommandBar
-            todayBoard(width: proxy.size.width)
-            supportGrid(width: proxy.size.width)
+      ScrollViewReader { scrollProxy in
+        GeometryReader { proxy in
+          let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+              mastheadPanel(width: proxy.size.width, metrics: metrics)
+              homeCommandBar
+              todayBoard(metrics: metrics)
+              supportGrid(metrics: metrics)
+            }
+            .padding(.horizontal, metrics.horizontalPadding)
+            .padding(.vertical, metrics.regularPanelPadding)
+            .frame(maxWidth: metrics.contentMaxWidth)
+            .frame(maxWidth: .infinity, alignment: .top)
           }
-          .padding(.horizontal, horizontalPadding(for: proxy.size.width))
-          .padding(.vertical, 28)
-          .frame(maxWidth: 1_440)
-          .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .onAppear {
+          focusTargetTodo(using: scrollProxy)
+        }
+        .onChange(of: appRouter.route.nonce) { _ in
+          focusTargetTodo(using: scrollProxy)
+        }
+        .onChange(of: dashboardViewModel.state.visibleTodos.map(\.id)) { _ in
+          focusTargetTodo(using: scrollProxy)
         }
       }
       .background(backgroundView)
       .navigationTitle("Home")
+      .safeAreaInset(edge: .bottom) {
+        FooterMessageHost(message: footerMessage)
+      }
       .task(priority: .utility) {
         await refreshDashboard(force: false)
       }
-      .animation(.snappy(duration: 0.26), value: calendarStore.events.count)
-      .animation(.snappy(duration: 0.26), value: stageStore.stages.count)
-      .animation(.snappy(duration: 0.26), value: marketNewsStore.news.count)
       .sheet(item: $selectedEvent) { event in
         NavigationStack {
           CalendarEventDetailView(event: event)
@@ -46,24 +54,14 @@ struct DashboardView: View {
         }
         .presentationDetents([.medium, .large])
       }
-      .alert(
-        "Blocked",
-        isPresented: Binding(
-          get: { !blockedMessage.isEmpty },
-          set: { if !$0 { blockedMessage = "" } }
-        )
-      ) {
-        Button("OK", role: .cancel) { blockedMessage = "" }
-      } message: {
-        Text(blockedMessage)
-      }
     }
+    .instrumentedScreen("DashboardView")
   }
 
-  private func mastheadPanel(width: CGFloat) -> some View {
-    dashboardPanel(tint: .teal, padding: width >= 900 ? 28 : 22) {
-      VStack(alignment: .leading, spacing: 22) {
-        if width >= 900 {
+  private func mastheadPanel(width: CGFloat, metrics: WorkspaceLayoutMetrics) -> some View {
+    return dashboardPanel(tint: WorkspacePalette.accent, padding: metrics.regularPanelPadding) {
+      VStack(alignment: .leading, spacing: 24) {
+        if metrics.sizeClass != .compact {
           HStack(alignment: .top, spacing: 24) {
             mastheadCopy(width: width)
             Spacer(minLength: 0)
@@ -77,12 +75,13 @@ struct DashboardView: View {
           }
         }
 
-        if width >= 960 {
+        if metrics.sizeClass == .wide {
           HStack(alignment: .top, spacing: 16) {
             nextEventSpotlight
             nextTodoSpotlight
             snapshotSpotlight
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
         } else {
           VStack(alignment: .leading, spacing: 14) {
             nextEventSpotlight
@@ -96,8 +95,8 @@ struct DashboardView: View {
 
   private var homeCommandBar: some View {
     WorkspaceCommandBar(
-      title: "Now",
-      subtitle: "Keep the command loop short: refresh, sync, and watch the live state."
+      title: "Workspace",
+      subtitle: "Refresh quietly, sync when needed, and keep the page focused on what matters today."
     ) {
       Button {
         Task { await refreshDashboard(force: true) }
@@ -105,36 +104,42 @@ struct DashboardView: View {
         Label("Refresh", systemImage: "arrow.clockwise")
       }
       .buttonStyle(.borderedProminent)
-      .tint(.teal)
+      .tint(WorkspacePalette.accent)
 
       Button {
         Task { await stageStore.syncFromNotion() }
       } label: {
-        Label("Sync stages", systemImage: "arrow.triangle.2.circlepath")
+        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
       }
       .buttonStyle(.bordered)
 
       WorkspaceBadge(
-        text: googleAuthStore.isAuthenticated ? "Calendar live" : "Calendar idle",
-        tint: googleAuthStore.isAuthenticated ? .green : .orange
+        text: googleAuthStore.isAuthenticated ? "Calendar connected" : "Calendar offline",
+        tint: googleAuthStore.isAuthenticated ? WorkspacePalette.success : WorkspacePalette.warning
       )
 
       WorkspaceBadge(
-        text: focusStore.isEnabled ? "Focus on" : "Focus off",
-        tint: focusStore.isEnabled ? .teal : .white
+        text: configStore.config.focusModeEnabled ? "Focus on" : "Focus off",
+        tint: configStore.config.focusModeEnabled ? WorkspacePalette.accent : .white
       )
     }
   }
 
   private func mastheadCopy(width: CGFloat) -> some View {
     VStack(alignment: .leading, spacing: 12) {
+      Image("DashboardLogo")
+        .resizable()
+        .scaledToFit()
+        .frame(width: width >= 980 ? 86 : 72)
+        .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
+
       Text("HOME CONTROL")
         .font(.caption2.weight(.bold))
-        .tracking(2.4)
+        .tracking(1.8)
         .foregroundStyle(Color.white.opacity(0.70))
 
-      Text(width >= 980 ? "Run the day,\nnot the backlog." : "Run the day, not the backlog.")
-        .font(.system(size: width >= 1_120 ? 50 : 40, weight: .bold, design: .serif))
+      Text(width >= 980 ? "A cleaner view of\nyour day." : "A cleaner view of your day.")
+        .font(.system(size: width >= 1_120 ? 46 : 38, weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
         .fixedSize(horizontal: false, vertical: true)
 
@@ -142,7 +147,7 @@ struct DashboardView: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.white.opacity(0.80))
 
-      Text("The first screen now behaves like a control room: agenda on one side, todo on the other, and the pipeline signals underneath.")
+      Text("The dashboard is now centered on three things only: the next event, the next todo, and a compact operational snapshot.")
         .font(.subheadline)
         .foregroundStyle(Color.white.opacity(0.72))
         .fixedSize(horizontal: false, vertical: true)
@@ -152,7 +157,7 @@ struct DashboardView: View {
 
   private func mastheadSidePanel(alignment: HorizontalAlignment, textAlignment: TextAlignment) -> some View {
     VStack(alignment: alignment, spacing: 12) {
-      focusBadge
+      DashboardFocusSessionBadge()
       connectionBadge
 
       if !calendarStore.statusMessage.isEmpty {
@@ -165,8 +170,8 @@ struct DashboardView: View {
   }
 
   private var nextEventSpotlight: some View {
-    spotlightCard(title: "Next event", tint: .teal, systemImage: "calendar.badge.clock") {
-      if let event = upcomingEvents.first {
+    spotlightCard(title: "Next event", tint: WorkspacePalette.accent, systemImage: "calendar.badge.clock") {
+      if let event = dashboardViewModel.state.nextEvent {
         Text(event.summary.isEmpty ? "Event" : event.summary)
           .font(.headline)
           .foregroundStyle(.white)
@@ -190,7 +195,7 @@ struct DashboardView: View {
   }
 
   private var nextTodoSpotlight: some View {
-    spotlightCard(title: "Next todo", tint: .orange, systemImage: "checklist") {
+    spotlightCard(title: "Next todo", tint: WorkspacePalette.warning, systemImage: "checklist") {
       if let todo = nextTodo {
         Text(todo.title)
           .font(.headline)
@@ -201,8 +206,8 @@ struct DashboardView: View {
           .font(.caption)
           .foregroundStyle(Color.white.opacity(0.70))
 
-        if let stage = stageForTodo(todo) {
-          Text(stage.displayLabel)
+        if let label = stageLabel(for: todo), !label.isEmpty {
+          Text(label)
             .font(.caption)
             .foregroundStyle(Color.white.opacity(0.62))
             .lineLimit(1)
@@ -217,28 +222,30 @@ struct DashboardView: View {
   }
 
   private var snapshotSpotlight: some View {
-    spotlightCard(title: "Today snapshot", tint: .pink, systemImage: "chart.line.uptrend.xyaxis") {
+    spotlightCard(title: "Overview", tint: .white, systemImage: "chart.bar.xaxis") {
       VStack(alignment: .leading, spacing: 10) {
-        snapshotLine(label: "Upcoming", value: "\(upcomingEvents.count)")
+        snapshotLine(label: "Upcoming", value: "\(calendarStore.upcomingCount)")
         snapshotLine(label: "Open todos", value: "\(openTodoCount)")
         snapshotLine(label: "Overdue", value: "\(overdueTodoCount)")
-        snapshotLine(label: "Blockers", value: "\(stageStore.blockers.count)")
+        snapshotLine(label: "Queue", value: "\(dashboardViewModel.state.pendingQueueCount)")
       }
     }
   }
 
-  private func todayBoard(width: CGFloat) -> some View {
+  private func todayBoard(metrics: WorkspaceLayoutMetrics) -> some View {
     dashboardPanel(
       title: "Today board",
-      subtitle: "Agenda and todo share the same split-screen so the next moves are visible at a glance.",
-      tint: .orange,
-      padding: width >= 900 ? 28 : 22
+      subtitle: "Agenda and tasks stay side by side so the next move is always visible.",
+      tint: WorkspacePalette.warning,
+      padding: metrics.regularPanelPadding
     ) {
-      if width >= splitBoardThreshold {
+      if metrics.sizeClass == .wide {
         HStack(alignment: .top, spacing: 22) {
           agendaColumn
+            .workspaceAlignedCard(minHeight: 420)
           splitDivider(isVertical: true)
           todoColumn
+            .workspaceAlignedCard(minHeight: 420)
         }
       } else {
         VStack(alignment: .leading, spacing: 20) {
@@ -255,14 +262,14 @@ struct DashboardView: View {
       boardHeader(
         title: "Agenda",
         subtitle: "Upcoming calendar events",
-        accent: .teal,
-        countText: "\(upcomingEvents.count)"
+        accent: WorkspacePalette.accent,
+        countText: "\(dashboardViewModel.state.upcomingEvents.count)"
       )
 
       if calendarStore.isLoading {
         ProgressView("Loading events...")
-          .tint(.teal)
-      } else if upcomingEvents.isEmpty {
+          .tint(WorkspacePalette.accent)
+      } else if dashboardViewModel.state.upcomingEvents.isEmpty {
         emptyState(
           title: "No upcoming event",
           message: googleAuthStore.isAuthenticated || !configStore.config.externalIcalUrl.isEmpty
@@ -270,9 +277,9 @@ struct DashboardView: View {
             : "Connect Google Calendar or add an external iCal URL in Settings."
         )
       } else {
-        let events = Array(upcomingEvents.prefix(6))
-        ForEach(Array(events.enumerated()), id: \.offset) { index, event in
-          agendaTimelineRow(event, isLast: index == events.count - 1)
+        let events = dashboardViewModel.state.upcomingEvents
+        ForEach(events) { event in
+          agendaTimelineRow(event, isLast: event.id == events.last?.id)
         }
       }
     }
@@ -284,39 +291,43 @@ struct DashboardView: View {
       boardHeader(
         title: "Todo",
         subtitle: "Deadlines and pipeline follow-ups",
-        accent: .orange,
+        accent: WorkspacePalette.warning,
         countText: "\(openTodoCount) open"
       )
 
-      if stageStore.sortedTodos.isEmpty {
+      if dashboardViewModel.state.visibleTodos.isEmpty {
         emptyState(
           title: "No todo item",
           message: "Automation todos will appear here when stages move through the pipeline."
         )
       } else {
-        let todos = Array(stageStore.sortedTodos.prefix(6))
-        ForEach(Array(todos.enumerated()), id: \.offset) { index, todo in
-          todoQueueRow(todo, isLast: index == todos.count - 1)
+        let todos = visibleTodos
+        ForEach(todos) { todo in
+          todoQueueRow(
+            todo,
+            isLast: todo.id == todos.last?.id,
+            isHighlighted: isTodoHighlighted(todo.id)
+          )
+          .id(todoRowID(todo.id))
         }
       }
     }
+    .id("home-todo-section")
     .frame(maxWidth: .infinity, alignment: .topLeading)
   }
 
-  private func supportGrid(width: CGFloat) -> some View {
-    LazyVGrid(columns: supportColumns(for: width), alignment: .leading, spacing: 18) {
+  private func supportGrid(metrics: WorkspaceLayoutMetrics) -> some View {
+    LazyVGrid(columns: supportColumns(for: metrics), alignment: .leading, spacing: metrics.panelGap) {
       overviewPanel
-      blockersPanel
-      qualityPanel
       marketsPanel
       newsPanel
     }
   }
 
   private var overviewPanel: some View {
-    let kpi = stageStore.weeklyKPI
+    let kpi = dashboardViewModel.state.weeklyKPI
 
-    return dashboardPanel(title: "Pipeline overview", subtitle: "Status distribution and weekly cadence", tint: .blue) {
+    return dashboardPanel(title: "Pipeline overview", subtitle: "Status distribution and weekly cadence", tint: WorkspacePalette.accentSoft) {
       VStack(alignment: .leading, spacing: 16) {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
           compactMetric(title: "Open", value: "\(count(for: .open))", tint: statusColor(.open))
@@ -328,9 +339,9 @@ struct DashboardView: View {
         subtleDivider
 
         VStack(alignment: .leading, spacing: 10) {
-          overviewLine(label: "Added this week", value: "\(kpi.addedCount)")
-          overviewLine(label: "Applied this week", value: "\(kpi.appliedCount)")
-          overviewLine(label: "Pending queue", value: "\(stageStore.pendingQueueCount)")
+      overviewLine(label: "Added this week", value: "\(kpi.addedCount)")
+      overviewLine(label: "Applied this week", value: "\(kpi.appliedCount)")
+      overviewLine(label: "Pending queue", value: "\(dashboardViewModel.state.pendingQueueCount)")
         }
 
         VStack(alignment: .leading, spacing: 8) {
@@ -359,85 +370,11 @@ struct DashboardView: View {
         }
       }
     }
-  }
-
-  private var blockersPanel: some View {
-    dashboardPanel(title: "Blockers", subtitle: "Items stuck beyond the expected delay", tint: .pink) {
-      VStack(alignment: .leading, spacing: 12) {
-        if stageStore.blockers.isEmpty {
-          emptyState(title: "No blocker found", message: "Open and applied stages are moving within the expected SLA.")
-        } else {
-          ForEach(stageStore.blockers.prefix(4)) { blocker in
-            VStack(alignment: .leading, spacing: 10) {
-              HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                  Text(blocker.stage.displayLabel.isEmpty ? "Stage" : blocker.stage.displayLabel)
-                    .font(.subheadline.weight(.semibold))
-                  Text("\(blocker.reason) · \(blocker.stagnantDays)d")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Move to \(blocker.suggestedStatus.rawValue)") {
-                  Task {
-                    await stageStore.updateStageStatus(stageID: blocker.stage.id, to: blocker.suggestedStatus)
-                  }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.pink)
-                .font(.caption.weight(.semibold))
-              }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .workspaceInteractiveSurface(cornerRadius: 20, tint: .pink, raised: false)
-          }
-        }
-      }
-    }
-  }
-
-  private var qualityPanel: some View {
-    dashboardPanel(title: "Data quality", subtitle: "Quick fixes for incomplete records", tint: .mint) {
-      VStack(alignment: .leading, spacing: 12) {
-        if stageStore.qualityIssues.isEmpty {
-          emptyState(title: "No issue detected", message: "Company, URL, and deadline fields are populated.")
-        } else {
-          ForEach(stageStore.qualityIssues.prefix(5)) { issue in
-            HStack(alignment: .top, spacing: 12) {
-              VStack(alignment: .leading, spacing: 4) {
-                Text(issue.stage.displayLabel.isEmpty ? "Stage" : issue.stage.displayLabel)
-                  .font(.subheadline.weight(.semibold))
-                Text("Field: \(issue.field.rawValue)")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-                if !issue.suggestedValue.isEmpty {
-                  Text(issue.suggestedValue)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                }
-              }
-              Spacer()
-              if !issue.suggestedValue.isEmpty {
-                Button("Apply") {
-                  stageStore.applyQualityFix(issue)
-                }
-                .buttonStyle(.bordered)
-                .font(.caption.weight(.semibold))
-              }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .workspaceInteractiveSurface(cornerRadius: 18, tint: .mint, raised: false)
-          }
-        }
-      }
-    }
+    .workspaceAlignedCard(minHeight: 390)
   }
 
   private var marketsPanel: some View {
-    dashboardPanel(title: "Markets", subtitle: "Configured symbols from Yahoo Finance", tint: .green) {
+    dashboardPanel(title: "Markets", subtitle: "Configured symbols from Yahoo Finance", tint: WorkspacePalette.success) {
       VStack(alignment: .leading, spacing: 12) {
         if marketNewsStore.quotes.isEmpty {
           Text(marketNewsStore.isLoadingQuotes ? "Loading quotes..." : "No market quote available.")
@@ -459,7 +396,7 @@ struct DashboardView: View {
                   .font(.subheadline.weight(.bold))
                 Text(String(format: "%+.2f%%", quote.changePercent))
                   .font(.caption)
-                  .foregroundStyle(quote.changePercent >= 0 ? Color.green : Color.red)
+                  .foregroundStyle(quote.changePercent >= 0 ? WorkspacePalette.success : Color.red)
               }
             }
             .padding(.vertical, 3)
@@ -467,43 +404,11 @@ struct DashboardView: View {
         }
       }
     }
+    .workspaceAlignedCard(minHeight: 390)
   }
 
   private var newsPanel: some View {
-    dashboardPanel(title: "News", subtitle: "Headlines that may affect the pipeline", tint: .yellow) {
-      VStack(alignment: .leading, spacing: 12) {
-        if marketNewsStore.news.isEmpty {
-          Text(marketNewsStore.isLoadingNews ? "Loading headlines..." : "No headline available.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          ForEach(marketNewsStore.news.prefix(4)) { item in
-            HStack(alignment: .top, spacing: 12) {
-              VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                  .font(.subheadline.weight(.semibold))
-                  .lineLimit(3)
-                Text("\(item.source) · \(item.publishedAt.shortDateTime)")
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-              }
-              Spacer()
-              Button("Open") {
-                guard let url = URL(string: item.link) else { return }
-                if focusStore.isBlocked(url: url) {
-                  blockedMessage = focusStore.blockedReason(for: url)
-                  return
-                }
-                openURL(url)
-              }
-              .buttonStyle(.bordered)
-              .font(.caption.weight(.semibold))
-            }
-            .padding(.vertical, 2)
-          }
-        }
-      }
-    }
+    DashboardNewsPanel()
   }
 
   private func agendaTimelineRow(_ event: CalendarEvent, isLast: Bool) -> some View {
@@ -546,7 +451,7 @@ struct DashboardView: View {
 
           HStack(spacing: 8) {
             if !event.calendarName.isEmpty {
-              detailChip(text: event.calendarName, tint: .teal)
+              detailChip(text: event.calendarName, tint: WorkspacePalette.accent)
             }
             if !event.location.isEmpty {
               detailChip(text: event.location, tint: .white, usesNeutralStyle: true)
@@ -568,7 +473,7 @@ struct DashboardView: View {
     .buttonStyle(.plain)
   }
 
-  private func todoQueueRow(_ todo: TodoItem, isLast: Bool) -> some View {
+  private func todoQueueRow(_ todo: TodoItem, isLast: Bool, isHighlighted: Bool) -> some View {
     let isOverdue = todo.status != .done && todo.dueDate < Calendar.current.startOfDay(for: Date())
 
     return HStack(alignment: .top, spacing: 14) {
@@ -592,8 +497,8 @@ struct DashboardView: View {
           .font(.caption)
           .foregroundStyle(Color.white.opacity(0.68))
 
-        if let stage = stageForTodo(todo) {
-          detailChip(text: stage.displayLabel, tint: .orange)
+        if let label = stageLabel(for: todo), !label.isEmpty {
+          detailChip(text: label, tint: WorkspacePalette.warning)
         }
       }
 
@@ -617,6 +522,14 @@ struct DashboardView: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.vertical, 6)
+    .background(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(isHighlighted ? Color.white.opacity(0.06) : Color.clear)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .stroke(isHighlighted ? WorkspacePalette.warning.opacity(0.28) : Color.clear, lineWidth: 1.5)
+    }
     .overlay(alignment: .bottom) {
       if !isLast {
         Rectangle()
@@ -625,19 +538,6 @@ struct DashboardView: View {
           .padding(.leading, 86)
       }
     }
-  }
-
-  private var focusBadge: some View {
-    HStack(spacing: 8) {
-      Image(systemName: focusStore.isEnabled ? "timer" : "moon.zzz")
-      Text(focusStore.isEnabled ? "\(focusStore.phase.rawValue) · \(max(0, focusStore.remainingSeconds / 60))m left" : "Focus off")
-        .font(.caption.weight(.semibold))
-    }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
-    .background((focusStore.isEnabled ? Color.orange : Color.white).opacity(0.14))
-    .foregroundStyle(focusStore.isEnabled ? Color.orange : Color.white.opacity(0.74))
-    .clipShape(Capsule())
   }
 
   private var connectionBadge: some View {
@@ -671,7 +571,7 @@ struct DashboardView: View {
       content()
     }
     .padding(18)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .workspaceAlignedCard(minHeight: 166)
     .workspaceInteractiveSurface(cornerRadius: 22, tint: tint, raised: false)
   }
 
@@ -703,7 +603,7 @@ struct DashboardView: View {
     HStack(alignment: .top, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
-          .font(.title3.weight(.bold))
+          .font(.title3.weight(.semibold))
           .foregroundStyle(.white)
         Text(subtitle)
           .font(.caption)
@@ -741,7 +641,7 @@ struct DashboardView: View {
         .foregroundStyle(tint)
     }
     .padding(14)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .workspaceAlignedCard(minHeight: 88)
     .workspaceInteractiveSurface(cornerRadius: 16, tint: tint, raised: false)
   }
 
@@ -800,22 +700,18 @@ struct DashboardView: View {
       .frame(height: 1)
   }
 
-  private func supportColumns(for width: CGFloat) -> [GridItem] {
-    if width >= supportGridThreshold {
+  private func supportColumns(for metrics: WorkspaceLayoutMetrics) -> [GridItem] {
+    if metrics.sizeClass == .wide {
       return [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
     }
-    if width >= 860 {
+    if metrics.sizeClass == .medium {
       return [GridItem(.flexible()), GridItem(.flexible())]
     }
     return [GridItem(.flexible())]
   }
 
-  private func horizontalPadding(for width: CGFloat) -> CGFloat {
-    width >= 900 ? 28 : 18
-  }
-
-  private func stageForTodo(_ todo: TodoItem) -> Stage? {
-    stageStore.stages.first(where: { $0.id == todo.relatedStageID })
+  private func stageLabel(for todo: TodoItem) -> String? {
+    dashboardViewModel.state.stageLabelsByTodoID[todo.id]
   }
 
   private func todoSubtitle(for todo: TodoItem) -> String {
@@ -824,17 +720,17 @@ struct DashboardView: View {
   }
 
   private func count(for status: StageStatus) -> Int {
-    stageStore.stages.filter { $0.status == status }.count
+    dashboardViewModel.state.statusCounts[status] ?? 0
   }
 
   private func statusColor(_ status: StageStatus) -> Color {
     switch status {
     case .open:
-      return .blue
+      return WorkspacePalette.accent
     case .applied:
-      return .green
+      return WorkspacePalette.success
     case .interview:
-      return .orange
+      return WorkspacePalette.warning
     case .rejected:
       return .red
     }
@@ -843,24 +739,24 @@ struct DashboardView: View {
   private func todoStatusColor(_ status: TodoStatus) -> Color {
     switch status {
     case .notStarted:
-      return .orange
+      return WorkspacePalette.warning
     case .inProgress:
-      return .teal
+      return WorkspacePalette.accent
     case .done:
-      return .green
+      return WorkspacePalette.success
     }
   }
 
   private func eventTypeColor(for type: EventType) -> Color {
     switch type {
     case .meeting:
-      return .teal
+      return WorkspacePalette.accent
     case .interview:
-      return .orange
+      return WorkspacePalette.warning
     case .deadline:
       return .red
     case .defaultType:
-      return .blue
+      return WorkspacePalette.accentSoft
     }
   }
 
@@ -877,24 +773,20 @@ struct DashboardView: View {
     }
   }
 
-  private var upcomingEvents: [CalendarEvent] {
-    let now = Date()
-    return calendarStore.events
-      .filter { $0.end >= now.addingTimeInterval(-60 * 60) }
-      .sorted { $0.start < $1.start }
+  private var nextTodo: TodoItem? {
+    dashboardViewModel.state.nextTodo
   }
 
-  private var nextTodo: TodoItem? {
-    stageStore.sortedTodos.first(where: { $0.status != .done })
+  private var visibleTodos: [TodoItem] {
+    dashboardViewModel.state.visibleTodos
   }
 
   private var openTodoCount: Int {
-    stageStore.sortedTodos.filter { $0.status != .done }.count
+    dashboardViewModel.state.openTodoCount
   }
 
   private var overdueTodoCount: Int {
-    let startOfToday = Calendar.current.startOfDay(for: Date())
-    return stageStore.sortedTodos.filter { $0.status != .done && $0.dueDate < startOfToday }.count
+    dashboardViewModel.state.overdueTodoCount
   }
 
   private var calendarConnectionText: String {
@@ -915,7 +807,34 @@ struct DashboardView: View {
   }
 
   private var backgroundView: some View {
-    WorkspaceBackground()
+    WorkspaceBackground().equatable()
+  }
+
+  private var footerMessage: String? {
+    if !stageStore.syncMessage.isEmpty {
+      return stageStore.syncMessage
+    }
+    if !calendarStore.statusMessage.isEmpty {
+      return calendarStore.statusMessage
+    }
+    return nil
+  }
+
+  private func focusTargetTodo(using proxy: ScrollViewProxy) {
+    guard appRouter.destination == .home else { return }
+    guard let todoID = appRouter.route.todoID else { return }
+    let targetID = visibleTodos.contains(where: { $0.id == todoID }) ? todoRowID(todoID) : "home-todo-section"
+    withAnimation(.snappy(duration: 0.26)) {
+      proxy.scrollTo(targetID, anchor: .center)
+    }
+  }
+
+  private func isTodoHighlighted(_ todoID: String) -> Bool {
+    appRouter.destination == .home && appRouter.route.todoID == todoID
+  }
+
+  private func todoRowID(_ todoID: String) -> String {
+    "home-todo-\(todoID)"
   }
 
   private func refreshDashboard(force: Bool) async {
@@ -927,5 +846,66 @@ struct DashboardView: View {
 
     await calendarStore.prepareForLaunch(icalURL: configStore.config.externalIcalUrl)
     await marketNewsStore.prepareForLaunch()
+  }
+}
+
+private struct DashboardFocusSessionBadge: View {
+  @EnvironmentObject private var focusStore: FocusStore
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: focusStore.isEnabled ? "timer" : "moon.zzz")
+      Text(focusStore.isEnabled ? "\(focusStore.focusSummary) · \(max(0, focusStore.remainingSeconds / 60))m left" : "Focus off")
+        .font(.caption.weight(.semibold))
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .background((focusStore.isEnabled ? WorkspacePalette.accent : Color.white).opacity(0.12))
+    .foregroundStyle(focusStore.isEnabled ? WorkspacePalette.accentSoft : Color.white.opacity(0.74))
+    .clipShape(Capsule())
+  }
+}
+
+private struct DashboardNewsPanel: View {
+  @EnvironmentObject private var marketNewsStore: MarketNewsStore
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("News")
+          .font(.headline.weight(.semibold))
+          .foregroundStyle(.white)
+        Text("Headlines that may affect the market context")
+          .font(.caption)
+          .foregroundStyle(Color.white.opacity(0.66))
+      }
+
+      VStack(alignment: .leading, spacing: 12) {
+        if marketNewsStore.news.isEmpty {
+          Text(marketNewsStore.isLoadingNews ? "Loading headlines..." : "No headline available.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(marketNewsStore.news.prefix(4)) { item in
+            HStack(alignment: .top, spacing: 12) {
+              VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                  .font(.subheadline.weight(.semibold))
+                  .lineLimit(3)
+                Text("\(item.source) · \(item.publishedAt.shortDateTime)")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+              Spacer()
+              ProtectedLinkButton(title: "Open", systemImage: "link", urlString: item.link, tint: WorkspacePalette.accent)
+            }
+            .padding(.vertical, 2)
+          }
+        }
+      }
+    }
+    .padding(24)
+    .workspaceAlignedCard(minHeight: 390)
+    .workspaceInteractiveSurface(cornerRadius: 32, tint: WorkspacePalette.accent)
   }
 }

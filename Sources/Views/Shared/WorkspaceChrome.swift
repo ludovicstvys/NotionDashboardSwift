@@ -1,24 +1,81 @@
 import SwiftUI
 
-enum WorkspacePalette {
-  static let backgroundTop = Color(red: 0.04, green: 0.06, blue: 0.11)
-  static let backgroundBottom = Color(red: 0.08, green: 0.10, blue: 0.16)
-  static let panelBase = Color(red: 0.08, green: 0.10, blue: 0.15).opacity(0.96)
-  static let panelRaised = Color(red: 0.11, green: 0.13, blue: 0.20).opacity(0.98)
-  static let innerCard = Color.white.opacity(0.07)
-  static let line = Color.white.opacity(0.10)
-  static let subtleText = Color.white.opacity(0.66)
-  static let primaryText = Color.white
+enum WorkspaceSizeClass {
+  case compact
+  case medium
+  case wide
+
+  init(width: CGFloat) {
+    if width >= 1_120 {
+      self = .wide
+    } else if width >= 900 {
+      self = .medium
+    } else {
+      self = .compact
+    }
+  }
 }
 
-struct WorkspaceBackground: View {
+struct WorkspaceLayoutMetrics {
+  let sizeClass: WorkspaceSizeClass
+  let horizontalPadding: CGFloat
+  let contentMaxWidth: CGFloat
+  let sectionSpacing: CGFloat
+  let panelGap: CGFloat
+  let compactPanelPadding: CGFloat
+  let regularPanelPadding: CGFloat
+
+  init(width: CGFloat) {
+    let sizeClass = WorkspaceSizeClass(width: width)
+    self.sizeClass = sizeClass
+    contentMaxWidth = 1_440
+
+    switch sizeClass {
+    case .wide:
+      horizontalPadding = 28
+      sectionSpacing = 24
+      panelGap = 20
+      compactPanelPadding = 22
+      regularPanelPadding = 28
+    case .medium:
+      horizontalPadding = 24
+      sectionSpacing = 22
+      panelGap = 18
+      compactPanelPadding = 20
+      regularPanelPadding = 24
+    case .compact:
+      horizontalPadding = 18
+      sectionSpacing = 20
+      panelGap = 16
+      compactPanelPadding = 18
+      regularPanelPadding = 22
+    }
+  }
+}
+
+enum WorkspacePalette {
+  static let backgroundTop = Color(red: 0.04, green: 0.08, blue: 0.10)
+  static let backgroundBottom = Color(red: 0.08, green: 0.12, blue: 0.14)
+  static let panelBase = Color(red: 0.10, green: 0.14, blue: 0.16).opacity(0.97)
+  static let panelRaised = Color(red: 0.14, green: 0.18, blue: 0.20).opacity(0.985)
+  static let innerCard = Color.white.opacity(0.055)
+  static let line = Color.white.opacity(0.08)
+  static let subtleText = Color.white.opacity(0.64)
+  static let primaryText = Color.white
+  static let accent = Color(red: 0.18, green: 0.73, blue: 0.80)
+  static let accentSoft = Color(red: 0.57, green: 0.87, blue: 0.83)
+  static let success = Color(red: 0.42, green: 0.85, blue: 0.56)
+  static let warning = Color(red: 0.98, green: 0.70, blue: 0.30)
+}
+
+struct WorkspaceBackground: View, Equatable {
   var body: some View {
     ZStack {
       LinearGradient(
         colors: [
           WorkspacePalette.backgroundTop,
           WorkspacePalette.backgroundBottom,
-          Color(red: 0.11, green: 0.13, blue: 0.19),
+          Color(red: 0.12, green: 0.14, blue: 0.18),
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -26,7 +83,7 @@ struct WorkspaceBackground: View {
       .ignoresSafeArea()
 
       RadialGradient(
-        colors: [Color.teal.opacity(0.22), .clear],
+        colors: [WorkspacePalette.accent.opacity(0.18), .clear],
         center: .topLeading,
         startRadius: 30,
         endRadius: 420
@@ -34,46 +91,33 @@ struct WorkspaceBackground: View {
       .offset(x: -140, y: -120)
 
       RadialGradient(
-        colors: [Color.orange.opacity(0.18), .clear],
-        center: .topTrailing,
+        colors: [Color.white.opacity(0.07), .clear],
+        center: .top,
         startRadius: 30,
-        endRadius: 420
+        endRadius: 360
       )
-      .offset(x: 140, y: -180)
+      .offset(x: 0, y: -220)
 
       RadialGradient(
-        colors: [Color.white.opacity(0.06), .clear],
+        colors: [WorkspacePalette.accentSoft.opacity(0.10), .clear],
         center: .bottomTrailing,
         startRadius: 20,
         endRadius: 500
       )
       .offset(x: 180, y: 220)
 
-      WorkspaceGridPattern()
-        .blendMode(.softLight)
-        .opacity(0.22)
+      LinearGradient(
+        colors: [
+          Color.white.opacity(0.05),
+          .clear,
+          Color.white.opacity(0.03),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+      .blendMode(.softLight)
+      .opacity(0.28)
     }
-  }
-}
-
-private struct WorkspaceGridPattern: View {
-  var body: some View {
-    GeometryReader { proxy in
-      Path { path in
-        let width = proxy.size.width
-        let height = proxy.size.height
-        stride(from: 0.0, through: width, by: 36.0).forEach { x in
-          path.move(to: CGPoint(x: x, y: 0))
-          path.addLine(to: CGPoint(x: x, y: height))
-        }
-        stride(from: 0.0, through: height, by: 36.0).forEach { y in
-          path.move(to: CGPoint(x: 0, y: y))
-          path.addLine(to: CGPoint(x: width, y: y))
-        }
-      }
-      .stroke(Color.white.opacity(0.07), lineWidth: 0.5)
-    }
-    .ignoresSafeArea()
   }
 }
 
@@ -103,7 +147,7 @@ struct WorkspacePanel<Content: View>: View {
       if let title {
         VStack(alignment: .leading, spacing: 6) {
           Text(title)
-            .font(.title3.weight(.bold))
+            .font(.headline.weight(.semibold))
             .foregroundStyle(WorkspacePalette.primaryText)
           if let subtitle {
             Text(subtitle)
@@ -144,10 +188,10 @@ struct WorkspaceCommandBar<Content: View>: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(title.uppercased())
           .font(.caption2.weight(.bold))
-          .tracking(2.0)
+          .tracking(1.8)
           .foregroundStyle(WorkspacePalette.subtleText)
         Text(subtitle)
-          .font(.subheadline.weight(.semibold))
+          .font(.subheadline)
           .foregroundStyle(WorkspacePalette.primaryText)
       }
 
@@ -179,14 +223,14 @@ struct WorkspaceMetricTile: View {
       HStack(spacing: 8) {
         Circle()
           .fill(tint)
-          .frame(width: 8, height: 8)
+          .frame(width: 7, height: 7)
         Text(title)
           .font(.caption.weight(.semibold))
           .foregroundStyle(WorkspacePalette.subtleText)
       }
 
       Text(value)
-        .font(.system(size: 28, weight: .bold, design: .rounded))
+        .font(.system(size: 26, weight: .semibold, design: .rounded))
         .foregroundStyle(tint)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
@@ -197,7 +241,7 @@ struct WorkspaceMetricTile: View {
         .fixedSize(horizontal: false, vertical: true)
     }
     .padding(16)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    .frame(maxWidth: .infinity, minHeight: 118, maxHeight: .infinity, alignment: .leading)
     .workspaceInteractiveSurface(cornerRadius: 20, tint: tint, raised: false)
   }
 }
@@ -232,6 +276,7 @@ struct WorkspaceEmptyState: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(18)
+    .frame(minHeight: 96, alignment: .topLeading)
     .workspaceInteractiveSurface(cornerRadius: 20, tint: tint, raised: false)
   }
 }
@@ -245,15 +290,41 @@ struct WorkspaceBadge: View {
       .font(.caption.weight(.bold))
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
-      .background(
-        Capsule(style: .continuous)
-          .fill(tint.opacity(0.16))
+    .background(
+      Capsule(style: .continuous)
+          .fill(tint.opacity(0.14))
       )
       .overlay(
         Capsule(style: .continuous)
-          .stroke(Color.white.opacity(0.08), lineWidth: 1)
+          .stroke(Color.white.opacity(0.06), lineWidth: 1)
       )
       .foregroundStyle(tint)
+  }
+}
+
+struct FooterMessageHost: View {
+  let message: String?
+
+  var body: some View {
+    Group {
+      if let message, !message.isEmpty {
+        Text(message)
+          .font(.caption)
+          .foregroundStyle(Color.white.opacity(0.84))
+          .padding(.horizontal, 12)
+          .padding(.vertical, 10)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(WorkspacePalette.panelBase.opacity(0.94))
+          .overlay(
+            Rectangle()
+              .fill(Color.white.opacity(0.08))
+              .frame(height: 1),
+            alignment: .top
+          )
+          .transition(.move(edge: .bottom).combined(with: .opacity))
+      }
+    }
+    .animation(.easeOut(duration: 0.20), value: message)
   }
 }
 
@@ -293,13 +364,31 @@ private struct WorkspaceInteractiveSurfaceModifier: ViewModifier {
   let tint: Color
   let raised: Bool
 
-#if os(macOS)
-  @State private var isHovered = false
-#endif
-
   func body(content: Content) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
+#if os(macOS)
+    content
+      .background(
+        shape
+          .fill(raised ? WorkspacePalette.panelRaised : WorkspacePalette.panelBase)
+      )
+      .overlay(
+        shape
+          .stroke(
+            Color.white.opacity(raised ? 0.12 : 0.08),
+            lineWidth: 1
+          )
+      )
+      .overlay(alignment: .topLeading) {
+        Capsule(style: .continuous)
+          .fill(tint.opacity(0.75))
+          .frame(width: 64, height: 3)
+          .padding(.top, 12)
+          .padding(.leading, 14)
+      }
+      .shadow(color: .black.opacity(raised ? 0.18 : 0.10), radius: raised ? 16 : 8, x: 0, y: raised ? 10 : 4)
+#else
     content
       .background(
         shape
@@ -348,13 +437,6 @@ private struct WorkspaceInteractiveSurfaceModifier: ViewModifier {
           .padding(.leading, 16)
       }
       .shadow(color: .black.opacity(raised ? 0.28 : 0.14), radius: raised ? 28 : 14, x: 0, y: raised ? 18 : 10)
-#if os(macOS)
-      .scaleEffect(isHovered ? 1.008 : 1.0)
-      .brightness(isHovered ? 0.01 : 0.0)
-      .animation(.snappy(duration: 0.22), value: isHovered)
-      .onHover { hovering in
-        isHovered = hovering
-      }
 #endif
   }
 }
@@ -366,5 +448,9 @@ extension View {
     raised: Bool = true
   ) -> some View {
     modifier(WorkspaceInteractiveSurfaceModifier(cornerRadius: cornerRadius, tint: tint, raised: raised))
+  }
+
+  func workspaceAlignedCard(minHeight: CGFloat = 0) -> some View {
+    frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
   }
 }

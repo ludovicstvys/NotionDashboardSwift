@@ -254,6 +254,7 @@ struct AppConfig: Codable, Hashable {
 
 struct Stage: Identifiable, Codable, Hashable {
   var id: String = UUID().uuidString
+  var notionPageID: String? = nil
   var title: String
   var company: String
   var url: String
@@ -268,17 +269,6 @@ struct Stage: Identifiable, Codable, Hashable {
   var displayLabel: String {
     [company, title].filter { !$0.isEmpty }.joined(separator: " - ")
   }
-}
-
-struct StageDraft: Equatable {
-  var title: String = ""
-  var company: String = ""
-  var url: String = ""
-  var location: String = ""
-  var status: StageStatus = .open
-  var deadline: Date? = nil
-  var notes: String = ""
-  var source: String = "manual"
 }
 
 enum TodoStatus: String, Codable, CaseIterable, Identifiable {
@@ -312,6 +302,16 @@ struct WeeklyStageKPI: Hashable {
   var appliedCount: Int
   var totalCount: Int
   var progressByStatus: [WeeklyStageProgress]
+
+  static let empty = WeeklyStageKPI(
+    weekStart: .distantPast,
+    addedCount: 0,
+    appliedCount: 0,
+    totalCount: 0,
+    progressByStatus: StageStatus.allCases.map {
+      WeeklyStageProgress(status: $0, count: 0, ratio: 0)
+    }
+  )
 }
 
 struct StageBlocker: Identifiable, Hashable {
@@ -426,6 +426,12 @@ struct CalendarEvent: Identifiable, Codable, Hashable {
     eventType = try c.decodeIfPresent(EventType.self, forKey: .eventType) ?? .defaultType
     attendees = try c.decodeIfPresent([String].self, forKey: .attendees) ?? []
   }
+}
+
+struct CalendarEventGroup: Identifiable, Hashable {
+  var id: Date { day }
+  var day: Date
+  var items: [CalendarEvent]
 }
 
 struct ConnectionsSnapshot: Codable {

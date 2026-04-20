@@ -10,6 +10,10 @@ final class DiagnosticsStore: ObservableObject {
   private let encoder: JSONEncoder
   private let decoder: JSONDecoder
   private let maxEntries = 200
+  private let persistenceScheduler = DebouncedWorkScheduler(
+    label: "com.loldashboard.notiondashboard.diagnostics-persist",
+    delay: 0.35
+  )
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -60,7 +64,18 @@ final class DiagnosticsStore: ObservableObject {
   }
 
   private func persist() {
-    guard let data = try? encoder.encode(entries) else { return }
-    defaults.set(data, forKey: storageKey)
+    let entries = self.entries
+    let defaults = self.defaults
+    let storageKey = self.storageKey
+    persistenceScheduler.schedule {
+      let start = CFAbsoluteTimeGetCurrent()
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      encoder.dateEncodingStrategy = .iso8601
+      guard let data = try? encoder.encode(entries) else { return }
+      defaults.set(data, forKey: storageKey)
+      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+      PerformanceMonitor.recordPersistence(label: "DiagnosticsStore.persist", durationMs: durationMs)
+    }
   }
 }

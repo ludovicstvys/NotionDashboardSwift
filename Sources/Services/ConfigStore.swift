@@ -27,6 +27,10 @@ final class ConfigStore: ObservableObject {
   private let defaults: UserDefaults
   private let encoder: JSONEncoder
   private let decoder: JSONDecoder
+  private let persistenceScheduler = DebouncedWorkScheduler(
+    label: "com.loldashboard.notiondashboard.config-store-persist",
+    delay: 0.25
+  )
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
@@ -96,7 +100,18 @@ final class ConfigStore: ObservableObject {
   }
 
   private func persist() {
-    guard let data = try? encoder.encode(config) else { return }
-    defaults.set(data, forKey: storageKey)
+    let config = self.config
+    let defaults = self.defaults
+    let storageKey = self.storageKey
+    persistenceScheduler.schedule {
+      let start = CFAbsoluteTimeGetCurrent()
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      encoder.dateEncodingStrategy = .iso8601
+      guard let data = try? encoder.encode(config) else { return }
+      defaults.set(data, forKey: storageKey)
+      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+      PerformanceMonitor.recordPersistence(label: "ConfigStore.persist", durationMs: durationMs)
+    }
   }
 }

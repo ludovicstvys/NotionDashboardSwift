@@ -1,46 +1,9 @@
 import SwiftUI
 
-private enum RootDestination: String, CaseIterable, Identifiable {
-  case home
-  case stages
-  case calendar
-  case settings
-
-  var id: String { rawValue }
-
-  var title: String {
-    switch self {
-    case .home:
-      return "Home"
-    case .stages:
-      return "Stages"
-    case .calendar:
-      return "Calendar"
-    case .settings:
-      return "Settings"
-    }
-  }
-
-  var systemImage: String {
-    switch self {
-    case .home:
-      return "rectangle.grid.2x2.fill"
-    case .stages:
-      return "square.grid.2x2.fill"
-    case .calendar:
-      return "calendar"
-    case .settings:
-      return "gearshape.fill"
-    }
-  }
-}
-
 struct RootView: View {
+  @EnvironmentObject private var appRouter: AppRouter
   @EnvironmentObject private var updateStore: UpdateStore
   @EnvironmentObject private var stageStore: StageStore
-#if os(macOS)
-  @State private var selection: RootDestination = .home
-#endif
 
   var body: some View {
     Group {
@@ -48,28 +11,35 @@ struct RootView: View {
       NavigationSplitView {
         sidebar
       } detail: {
-        detailView(for: selection)
+        detailContainer
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       .tint(.teal)
 #else
-      TabView {
+      TabView(selection: Binding(
+        get: { appRouter.destination },
+        set: { appRouter.select($0) }
+      )) {
         DashboardView()
+          .tag(RootDestination.home)
           .tabItem {
             Label("Home", systemImage: "rectangle.grid.2x2.fill")
           }
 
         StagesView()
+          .tag(RootDestination.stages)
           .tabItem {
             Label("Stages", systemImage: "square.grid.2x2.fill")
           }
 
         CalendarView()
+          .tag(RootDestination.calendar)
           .tabItem {
             Label("Calendar", systemImage: "calendar")
           }
 
         SettingsView()
+          .tag(RootDestination.settings)
           .tabItem {
             Label("Settings", systemImage: "gearshape.fill")
           }
@@ -84,31 +54,35 @@ struct RootView: View {
     }
   }
 
-  @ViewBuilder
-  private func detailView(for destination: RootDestination) -> some View {
-    switch destination {
-    case .home:
-      DashboardView()
-    case .stages:
-      StagesView()
-    case .calendar:
-      CalendarView()
-    case .settings:
-      SettingsView()
+  private var detailContainer: some View {
+    Group {
+      switch appRouter.destination {
+      case .home:
+        DashboardView()
+      case .stages:
+        StagesView()
+      case .calendar:
+        CalendarView()
+      case .settings:
+        SettingsView()
+      }
     }
   }
 
 #if os(macOS)
   private var sidebar: some View {
-    List(selection: $selection) {
+    List(selection: Binding(
+      get: { appRouter.destination },
+      set: { appRouter.select($0) }
+    )) {
       Section {
         WorkspaceSidebarHeader(
-          title: "Dashboard",
-          subtitle: "A calmer shell with content-first navigation and live system state.",
-          primaryBadge: updateStore.availableUpdate == nil ? "Up to date" : "Update ready",
-          primaryTint: updateStore.availableUpdate == nil ? .green : .teal,
+          title: "NotionDashboard",
+          subtitle: "A cleaner workspace focused on today, pipeline visibility, and calendar execution.",
+          primaryBadge: updateStore.availableUpdate == nil ? "Current" : "Update ready",
+          primaryTint: updateStore.availableUpdate == nil ? WorkspacePalette.success : WorkspacePalette.accent,
           secondaryBadge: stageStore.pendingQueueCount == 0 ? "Queue clear" : "\(stageStore.pendingQueueCount) queued",
-          secondaryTint: stageStore.pendingQueueCount == 0 ? .blue : .orange
+          secondaryTint: stageStore.pendingQueueCount == 0 ? WorkspacePalette.accentSoft : WorkspacePalette.warning
         )
         .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 14, trailing: 12))
         .listRowSeparator(.hidden)
@@ -125,19 +99,19 @@ struct RootView: View {
         }
       }
     }
-    .navigationTitle("Dashboard")
+    .navigationTitle("Workspace")
     .listStyle(.sidebar)
     .scrollContentBackground(.hidden)
-    .background(WorkspaceBackground())
+    .background(WorkspaceBackground().equatable())
   }
 
   private func sidebarRow(for destination: RootDestination) -> some View {
-    let isSelected = selection == destination
+    let isSelected = appRouter.destination == destination
 
     return HStack(spacing: 12) {
       Image(systemName: destination.systemImage)
         .font(.system(size: 14, weight: .semibold))
-        .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.72))
+        .foregroundStyle(isSelected ? WorkspacePalette.accentSoft : Color.white.opacity(0.72))
         .frame(width: 18)
 
       Text(destination.title)
@@ -148,24 +122,24 @@ struct RootView: View {
 
       if destination == .settings, updateStore.availableUpdate != nil {
         Circle()
-          .fill(Color.teal)
+          .fill(WorkspacePalette.accent)
           .frame(width: 8, height: 8)
       } else if destination == .stages, stageStore.pendingQueueCount > 0 {
         Text("\(stageStore.pendingQueueCount)")
           .font(.caption2.weight(.bold))
-          .foregroundStyle(isSelected ? .white : .orange)
+          .foregroundStyle(isSelected ? .white : WorkspacePalette.warning)
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 11)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .fill(isSelected ? WorkspacePalette.innerCard : Color.clear)
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(isSelected ? WorkspacePalette.panelRaised : Color.clear)
     )
     .overlay(
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(isSelected ? Color.white.opacity(0.10) : Color.clear, lineWidth: 1)
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .stroke(isSelected ? WorkspacePalette.accent.opacity(0.22) : Color.clear, lineWidth: 1)
     )
   }
 #endif

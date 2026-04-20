@@ -8,12 +8,26 @@ final class StageStore: ObservableObject {
     case launch
   }
 
+  private enum QueueFlushPolicy {
+    case keepFailures
+    case dropFailures
+  }
+
   @Published private(set) var stages: [Stage] = []
   @Published private(set) var todos: [TodoItem] = []
   @Published private(set) var pendingOperations: [PendingNotionOperation] = []
   @Published var isSyncingNotion: Bool = false
   @Published var syncMessage: String = ""
   @Published private(set) var lastSuccessfulNotionSyncDate: Date?
+  @Published private(set) var sortedTodos: [TodoItem] = []
+  @Published private(set) var weeklyKPI: WeeklyStageKPI = .empty
+  @Published private(set) var blockers: [StageBlocker] = []
+  @Published private(set) var qualityIssues: [StageQualityIssue] = []
+  @Published private(set) var statusCounts: [StageStatus: Int] = [:]
+  @Published private(set) var stageRevision: Int = 0
+  @Published private(set) var todoRevision: Int = 0
+  @Published private(set) var metricsRevision: Int = 0
+  @Published private(set) var dataRevision: Int = 0
 
   private let stagesStorageKey = "swift_notion_dashboard_stages_v1"
   private let todosStorageKey = "swift_notion_dashboard_todos_v1"
@@ -24,19 +38,30 @@ final class StageStore: ObservableObject {
   private let encoder: JSONEncoder
   private let decoder: JSONDecoder
   private let notionClient: NotionClient
+  private let stageRepository: StageRepository?
+  private let todoRepository: TodoRepository?
+  private let persistenceScheduler = DebouncedWorkScheduler(
+    label: "com.loldashboard.notiondashboard.stage-store-persist",
+    delay: 0.18
+  )
   private weak var configStore: ConfigStore?
   private weak var diagnostics: DiagnosticsStore?
+  private var stageSearchIndex: [String: String] = [:]
 
   init(
     configStore: ConfigStore,
     defaults: UserDefaults = .standard,
     diagnostics: DiagnosticsStore? = nil,
-    notionClient: NotionClient? = nil
+    notionClient: NotionClient? = nil,
+    stageRepository: StageRepository? = nil,
+    todoRepository: TodoRepository? = nil
   ) {
     self.configStore = configStore
     self.defaults = defaults
     self.diagnostics = diagnostics
     self.notionClient = notionClient ?? NotionClient(diagnostics: diagnostics)
+    self.stageRepository = stageRepository
+    self.todoRepository = todoRepository
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -50,36 +75,19 @@ final class StageStore: ObservableObject {
     load()
   }
 
+  func filteredStages(matching rawQuery: String) -> [Stage] {
+    let query = rawQuery.normalizedToken
+    guard !query.isEmpty else { return stages }
+    return stages.filter { stage in
+      stageSearchIndex[stage.id, default: ""].contains(query)
+    }
+  }
+
   func prepareForLaunch() async {
     guard let configStore else { return }
     guard configStore.config.hasNotionCredentials else { return }
     guard shouldSyncAtLaunch else { return }
     await syncFromNotion(trigger: .launch)
-  }
-
-  func addStage(draft: StageDraft) async {
-    let now = Date()
-    var stage = Stage(
-      title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-      company: draft.company.trimmingCharacters(in: .whitespacesAndNewlines),
-      url: draft.url.trimmingCharacters(in: .whitespacesAndNewlines),
-      location: draft.location.trimmingCharacters(in: .whitespacesAndNewlines),
-      status: draft.status,
-      deadline: draft.deadline,
-      notes: draft.notes.trimmingCharacters(in: .whitespacesAndNewlines),
-      source: draft.source.trimmingCharacters(in: .whitespacesAndNewlines),
-      createdAt: now,
-      updatedAt: now
-    )
-
-    if stage.title.isEmpty {
-      stage.title = "Stage"
-    }
-
-    let stored = upsertLocalStage(stage)
-    createAutomationTodos(for: stored, status: stored.status)
-    persist()
-    await syncSingleStageIfPossible(stored)
   }
 
   func updateStageStatus(stageID: String, to newStatus: StageStatus) async {
@@ -88,20 +96,35 @@ final class StageStore: ObservableObject {
     stages[index].status = newStatus
     stages[index].updatedAt = Date()
     let updated = stages[index]
-    createAutomationTodos(for: updated, status: newStatus)
-    persist()
+    persist(
+      immediateDatabase: true,
+      stageChanged: true,
+      todoChanged: false,
+      metricsChanged: true,
+      preferDeltaWrite: true,
+      upsertedStages: [updated]
+    )
 
     if configStore.config.hasNotionCredentials {
       do {
-        try await notionClient.updateStageStatus(pageID: stageID, status: newStatus, config: configStore.config)
-        diagnostics?.log(category: "notion", message: "Stage status updated.", metadata: ["stageID": stageID])
+        if let notionPageID = notionPageID(for: updated) {
+          try await notionClient.updateStageStatus(pageID: notionPageID, status: newStatus, config: configStore.config)
+        } else {
+          await syncSingleStageIfPossible(stageID: stageID)
+          return
+        }
+        diagnostics?.log(
+          category: "notion",
+          message: "Stage status updated.",
+          metadata: ["stageID": stageID, "notionPageID": notionPageID(for: updated) ?? ""]
+        )
       } catch {
         let queueItem: PendingNotionOperation
-        if isLikelyNotionPageID(stageID) {
+        if let notionPageID = notionPageID(for: updated), isLikelyNotionPageID(notionPageID) {
           queueItem = PendingNotionOperation(
             kind: .updateStatus,
             stage: nil,
-            stageID: stageID,
+            stageID: notionPageID,
             status: newStatus,
             createdAt: Date(),
             retryCount: 0
@@ -129,15 +152,32 @@ final class StageStore: ObservableObject {
   }
 
   func deleteStage(stageID: String) {
+    let deletedTodoIDs = Set(todos.filter { $0.relatedStageID == stageID }.map(\.id))
     stages.removeAll { $0.id == stageID }
     todos.removeAll { $0.relatedStageID == stageID }
-    persist()
+    persist(
+      immediateDatabase: true,
+      stageChanged: true,
+      todoChanged: !deletedTodoIDs.isEmpty,
+      metricsChanged: true,
+      preferDeltaWrite: true,
+      deletedStageIDs: Set([stageID]),
+      deletedTodoIDs: deletedTodoIDs
+    )
   }
 
   func setTodoStatus(todoID: String, status: TodoStatus) {
     guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
+    guard todos[index].automationTag.hasPrefix("notion:") else { return }
     todos[index].status = status
-    persist()
+    persist(
+      immediateDatabase: true,
+      stageChanged: false,
+      todoChanged: true,
+      metricsChanged: false,
+      preferDeltaWrite: true,
+      upsertedTodos: [todos[index]]
+    )
   }
 
   func syncFromNotion() async {
@@ -161,27 +201,54 @@ final class StageStore: ObservableObject {
       syncMessage = "Syncing all Notion stages..."
     }
 
-    await flushPendingOperations()
+    await flushPendingOperations(policy: .keepFailures)
+
+    let incrementalCutoff: Date?
+    switch trigger {
+    case .manual:
+      incrementalCutoff = nil
+    case .launch:
+      if shouldUseIncrementalLaunchSync {
+        incrementalCutoff = lastSuccessfulNotionSyncDate?.addingTimeInterval(-300)
+      } else {
+        incrementalCutoff = nil
+      }
+    }
 
     do {
-      let remoteStages = try await notionClient.fetchStages(config: configStore.config)
+      let remoteStages = try await notionClient.fetchStages(
+        config: configStore.config,
+        updatedAfter: incrementalCutoff
+      )
       let completedAt = Date()
       lastSuccessfulNotionSyncDate = completedAt
-      persistSyncMetadata()
 
-      if remoteStages.isEmpty {
-        if trigger == .manual {
-          syncMessage = "Notion sync done (0 stage)."
+      if incrementalCutoff == nil {
+        reconcileFullNotionRefresh(remoteStages)
+      } else {
+        remoteStages.forEach { remote in
+          _ = upsertLocalStage(remote)
         }
-        return
       }
 
-      remoteStages.forEach { remote in
-        upsertLocalStage(remote)
+      if !configStore.config.notionTodoDbId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let stagePageIDToLocalID: [String: String] = stages.reduce(into: [:]) { partial, stage in
+          guard let notionPageID = notionPageID(for: stage) else { return }
+          partial[notionPageID] = stage.id
+        }
+        let remoteTodos = try await notionClient.fetchTodos(
+          config: configStore.config,
+          stagePageIDToLocalID: stagePageIDToLocalID
+        )
+        mergeRemoteTodos(remoteTodos)
+      } else if !todos.isEmpty {
+        todos = []
       }
-      stages.sort { $0.updatedAt > $1.updatedAt }
+
       persist()
-      let message = "Notion sync done (\(remoteStages.count) stages)."
+      let message = incrementalCutoff == nil
+        ? "Notion sync done (\(remoteStages.count) stages)."
+        : "Notion sync refreshed (\(remoteStages.count) changed stages)."
       if trigger == .manual {
         syncMessage = message
       }
@@ -215,11 +282,16 @@ final class StageStore: ObservableObject {
     isSyncingNotion = true
     defer { isSyncingNotion = false }
 
-    await flushPendingOperations()
+    await flushPendingOperations(policy: .keepFailures)
 
     for stage in stages {
       do {
-        try await notionClient.upsertStage(stage, config: configStore.config)
+        let notionPageID = try await notionClient.upsertStage(
+          stage,
+          config: configStore.config,
+          knownPageID: notionPageID(for: stage)
+        )
+        updateNotionPageID(for: stage.id, notionPageID: notionPageID)
       } catch {
         enqueue(
           PendingNotionOperation(
@@ -245,17 +317,50 @@ final class StageStore: ObservableObject {
   }
 
   func flushPendingOperations() async {
-    guard let configStore else { return }
-    guard configStore.config.hasNotionCredentials else { return }
-    guard !pendingOperations.isEmpty else { return }
+    await flushPendingOperations(policy: .dropFailures)
+  }
+
+  private func flushPendingOperations(policy: QueueFlushPolicy) async {
+    guard let configStore else {
+      syncMessage = "Config unavailable."
+      return
+    }
+    if !configStore.config.hasNotionCredentials {
+      if policy == .dropFailures {
+        let droppedCount = pendingOperations.count
+        pendingOperations = []
+        persist(stageChanged: false, todoChanged: false, metricsChanged: true)
+        syncMessage = droppedCount == 0
+          ? "Queue already empty."
+          : "Queue flushed locally (\(droppedCount) dropped, no Notion credentials)."
+      } else {
+        syncMessage = "Missing Notion token/database config. Queue kept (\(pendingOperations.count))."
+      }
+      return
+    }
+    guard !pendingOperations.isEmpty else {
+      syncMessage = "Queue already empty."
+      return
+    }
+
+    let operations = pendingOperations.sorted { $0.createdAt < $1.createdAt }
+    let totalCount = operations.count
+    pendingOperations = []
+    persist(stageChanged: false, todoChanged: false, metricsChanged: true)
+    syncMessage = "Flushing queue (\(totalCount))..."
 
     var stillPending: [PendingNotionOperation] = []
-    for operation in pendingOperations {
+    for operation in operations {
       do {
         switch operation.kind {
         case .upsertStage:
           guard let stage = operation.stage else { continue }
-          try await notionClient.upsertStage(stage, config: configStore.config)
+          let notionPageID = try await notionClient.upsertStage(
+            stage,
+            config: configStore.config,
+            knownPageID: notionPageID(for: stage)
+          )
+          updateNotionPageID(for: stage.id, notionPageID: notionPageID)
         case .updateStatus:
           guard let stageID = operation.stageID, let status = operation.status else { continue }
           try await notionClient.updateStageStatus(pageID: stageID, status: status, config: configStore.config)
@@ -266,13 +371,41 @@ final class StageStore: ObservableObject {
         stillPending.append(next)
       }
     }
-    pendingOperations = stillPending
-    persist()
+
+    let droppedCount: Int
+    switch policy {
+    case .keepFailures:
+      pendingOperations = stillPending.sorted { $0.createdAt < $1.createdAt }
+      droppedCount = 0
+    case .dropFailures:
+      pendingOperations = []
+      droppedCount = stillPending.count
+    }
+
+    persist(stageChanged: false, todoChanged: false, metricsChanged: true)
+    let syncedCount = totalCount - stillPending.count
+    switch policy {
+    case .keepFailures:
+      syncMessage = stillPending.isEmpty
+        ? "Queue flush complete (\(syncedCount)/\(totalCount))."
+        : "Queue flush partial (\(syncedCount)/\(totalCount) synced, \(stillPending.count) pending)."
+    case .dropFailures:
+      syncMessage = droppedCount == 0
+        ? "Queue flushed (\(syncedCount)/\(totalCount) synced)."
+        : "Queue flushed (\(syncedCount) synced, \(droppedCount) dropped)."
+    }
+
     diagnostics?.log(
-      severity: stillPending.isEmpty ? .info : .warning,
+      severity: (policy == .keepFailures && !stillPending.isEmpty) ? .warning : .info,
       category: "notion-queue",
       message: "Queue flush done.",
-      metadata: ["remaining": "\(stillPending.count)"]
+      metadata: [
+        "policy": policy == .keepFailures ? "keep-failures" : "drop-failures",
+        "total": "\(totalCount)",
+        "synced": "\(syncedCount)",
+        "remaining": "\(pendingOperations.count)",
+        "dropped": "\(droppedCount)",
+      ]
     )
   }
 
@@ -293,91 +426,7 @@ final class StageStore: ObservableObject {
     }
   }
 
-  var weeklyKPI: WeeklyStageKPI {
-    let now = Date()
-    let weekStart = now.startOfWeekMonday()
-    let addedCount = stages.filter { $0.createdAt >= weekStart }.count
-    let appliedCount = stages.filter {
-      $0.status == .applied && $0.updatedAt >= weekStart
-    }.count
-    let totalCount = stages.count
-
-    let grouped = Dictionary(grouping: stages, by: \.status)
-    let progress = StageStatus.allCases.map { status in
-      let count = grouped[status]?.count ?? 0
-      let ratio = totalCount > 0 ? Double(count) / Double(totalCount) : 0
-      return WeeklyStageProgress(status: status, count: count, ratio: ratio)
-    }
-
-    return WeeklyStageKPI(
-      weekStart: weekStart,
-      addedCount: addedCount,
-      appliedCount: appliedCount,
-      totalCount: totalCount,
-      progressByStatus: progress
-    )
-  }
-
-  var blockers: [StageBlocker] {
-    let now = Date()
-    return stages.compactMap { stage in
-      let days = Calendar.current.dateComponents([.day], from: stage.updatedAt, to: now).day ?? 0
-      if stage.status == .open && days > 7 {
-        return StageBlocker(
-          stage: stage,
-          stagnantDays: days,
-          reason: "Ouvert > 7 jours",
-          suggestedStatus: .applied
-        )
-      }
-      if stage.status == .applied && days > 10 {
-        return StageBlocker(
-          stage: stage,
-          stagnantDays: days,
-          reason: "Candidature > 10 jours sans update",
-          suggestedStatus: .interview
-        )
-      }
-      return nil
-    }
-    .sorted { $0.stagnantDays > $1.stagnantDays }
-  }
-
-  var qualityIssues: [StageQualityIssue] {
-    var issues: [StageQualityIssue] = []
-    for stage in stages {
-      if stage.company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        issues.append(
-          StageQualityIssue(
-            stage: stage,
-            field: .company,
-            suggestedValue: inferCompany(from: stage.url)
-          )
-        )
-      }
-      if stage.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        issues.append(
-          StageQualityIssue(
-            stage: stage,
-            field: .url,
-            suggestedValue: ""
-          )
-        )
-      }
-      if stage.deadline == nil {
-        issues.append(
-          StageQualityIssue(
-            stage: stage,
-            field: .deadline,
-            suggestedValue: suggestDeadline(for: stage) ?? ""
-          )
-        )
-      }
-    }
-    return issues
-  }
-
-  func applyQualityFix(_ issue: StageQualityIssue) {
+  func applyQualityFix(_ issue: StageQualityIssue) async {
     guard let index = stages.firstIndex(where: { $0.id == issue.stage.id }) else { return }
     switch issue.field {
     case .company:
@@ -397,24 +446,46 @@ final class StageStore: ObservableObject {
       }
     }
     stages[index].updatedAt = Date()
-    persist()
-  }
-
-  var sortedTodos: [TodoItem] {
-    todos.sorted { $0.dueDate < $1.dueDate }
+    persist(
+      immediateDatabase: true,
+      stageChanged: true,
+      todoChanged: false,
+      metricsChanged: true,
+      preferDeltaWrite: true,
+      upsertedStages: [stages[index]]
+    )
+    await syncSingleStageIfPossible(
+      stageID: stages[index].id,
+      successMessage: "Quality fix synced to Notion.",
+      queuedMessagePrefix: "Quality fix queued (offline/retry)"
+    )
   }
 
   var pendingQueueCount: Int {
     pendingOperations.count
   }
 
-  private func syncSingleStageIfPossible(_ stage: Stage) async {
+  private func syncSingleStageIfPossible(
+    stageID: String,
+    successMessage: String = "Stage synced to Notion.",
+    queuedMessagePrefix: String = "Stage queued (offline/retry)"
+  ) async {
     guard let configStore else { return }
     guard configStore.config.hasNotionCredentials else { return }
+    guard let stage = stages.first(where: { $0.id == stageID }) else { return }
     do {
-      try await notionClient.upsertStage(stage, config: configStore.config)
-      syncMessage = "Stage synced to Notion."
-      diagnostics?.log(category: "notion", message: "Stage synced.", metadata: ["stageID": stage.id])
+      let notionPageID = try await notionClient.upsertStage(
+        stage,
+        config: configStore.config,
+        knownPageID: notionPageID(for: stage)
+      )
+      updateNotionPageID(for: stage.id, notionPageID: notionPageID)
+      syncMessage = successMessage
+      diagnostics?.log(
+        category: "notion",
+        message: successMessage,
+        metadata: ["stageID": stage.id, "notionPageID": notionPageID]
+      )
     } catch {
       enqueue(
         PendingNotionOperation(
@@ -426,7 +497,7 @@ final class StageStore: ObservableObject {
           retryCount: 0
         )
       )
-      syncMessage = "Stage queued (offline/retry): \(error.localizedDescription)"
+      syncMessage = "\(queuedMessagePrefix): \(error.localizedDescription)"
       diagnostics?.log(
         severity: .warning,
         category: "notion-queue",
@@ -441,6 +512,7 @@ final class StageStore: ObservableObject {
     if let idIndex = stages.firstIndex(where: { $0.id == incoming.id }) {
       var merged = incoming
       merged.createdAt = stages[idIndex].createdAt
+      merged.notionPageID = merged.notionPageID ?? stages[idIndex].notionPageID
       stages[idIndex] = merged
       return merged
     }
@@ -450,7 +522,8 @@ final class StageStore: ObservableObject {
       let existing = stages[duplicateIndex]
       merged.id = existing.id
       merged.createdAt = existing.createdAt
-      merged.updatedAt = Date()
+      merged.updatedAt = max(existing.updatedAt, incoming.updatedAt)
+      merged.notionPageID = merged.notionPageID ?? existing.notionPageID
       if merged.source.isEmpty { merged.source = existing.source }
       stages[duplicateIndex] = merged
       return merged
@@ -459,59 +532,6 @@ final class StageStore: ObservableObject {
     stages.append(incoming)
     stages.sort { $0.updatedAt > $1.updatedAt }
     return incoming
-  }
-
-  private struct TodoTemplate {
-    var tag: String
-    var title: String
-    var daysFromNow: Int
-    var notes: String
-  }
-
-  private func createAutomationTodos(for stage: Stage, status: StageStatus) {
-    let label = stage.displayLabel.isEmpty ? "Stage" : stage.displayLabel
-    let notes = [stage.url, stage.deadline?.shortDate].compactMap { value in
-      guard let value else { return nil }
-      let cleaned = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
-      return cleaned.isEmpty ? nil : cleaned
-    }
-    .joined(separator: "\n")
-
-    let templates: [TodoTemplate]
-    switch status {
-    case .open:
-      templates = [
-        .init(tag: "open-apply", title: "Postuler: \(label)", daysFromNow: 3, notes: notes),
-      ]
-    case .applied:
-      templates = [
-        .init(tag: "applied-followup", title: "Relance candidature: \(label)", daysFromNow: 5, notes: notes),
-        .init(tag: "applied-rh", title: "Suivi RH: \(label)", daysFromNow: 7, notes: notes),
-      ]
-    case .interview:
-      templates = [
-        .init(tag: "interview-prepare", title: "Prepa entretien: \(label)", daysFromNow: 2, notes: notes),
-        .init(tag: "interview-followup", title: "Suivi RH: \(label)", daysFromNow: 4, notes: notes),
-      ]
-    case .rejected:
-      templates = []
-    }
-
-    templates.forEach { template in
-      let automationTag = "\(stage.id)|\(template.tag)"
-      guard !todos.contains(where: { $0.automationTag == automationTag }) else { return }
-
-      let todo = TodoItem(
-        title: template.title,
-        dueDate: Date().addingDays(template.daysFromNow),
-        status: .notStarted,
-        notes: template.notes,
-        relatedStageID: stage.id,
-        automationTag: automationTag,
-        createdAt: Date()
-      )
-      todos.append(todo)
-    }
   }
 
   private func isDuplicate(_ lhs: Stage, _ rhs: Stage) -> Bool {
@@ -595,37 +615,148 @@ final class StageStore: ObservableObject {
   }
 
   private func load() {
-    lastSuccessfulNotionSyncDate = defaults.object(forKey: lastSuccessfulSyncDateKey) as? Date
-    if
-      let data = defaults.data(forKey: stagesStorageKey),
-      let decoded = try? decoder.decode([Stage].self, from: data)
-    {
-      stages = decoded
+    if let stageRepository, let todoRepository {
+      let storedStages = stageRepository.fetchAllStages()
+      let storedTodos = notionOnlyTodos(todoRepository.fetchSortedTodos())
+      if !storedStages.isEmpty || !storedTodos.isEmpty {
+        stages = storedStages
+        todos = storedTodos
+        lastSuccessfulNotionSyncDate = defaults.object(forKey: lastSuccessfulSyncDateKey) as? Date
+        if
+          let data = defaults.data(forKey: queueStorageKey),
+          let decoded = try? decoder.decode([PendingNotionOperation].self, from: data)
+        {
+          pendingOperations = decoded
+        }
+        refreshDerivedState()
+        bumpRevisions(stageChanged: true, todoChanged: true, metricsChanged: true)
+        WidgetSnapshotSync.syncStagesAndTodos(stages: stages, todos: todos)
+        return
+      }
     }
-    if
-      let data = defaults.data(forKey: todosStorageKey),
-      let decoded = try? decoder.decode([TodoItem].self, from: data)
-    {
-      todos = decoded
-    }
-    if
-      let data = defaults.data(forKey: queueStorageKey),
-      let decoded = try? decoder.decode([PendingNotionOperation].self, from: data)
-    {
-      pendingOperations = decoded
-    }
-  }
 
-  private func persist() {
-    if let stageData = try? encoder.encode(stages) {
-      defaults.set(stageData, forKey: stagesStorageKey)
+    if let snapshot = StageStoreCache.load() {
+      stages = snapshot.stages
+      todos = notionOnlyTodos(snapshot.todos)
+      pendingOperations = snapshot.pendingOperations
+      lastSuccessfulNotionSyncDate = snapshot.lastSuccessfulNotionSyncDate
+    } else {
+      lastSuccessfulNotionSyncDate = defaults.object(forKey: lastSuccessfulSyncDateKey) as? Date
+      if
+        let data = defaults.data(forKey: stagesStorageKey),
+        let decoded = try? decoder.decode([Stage].self, from: data)
+      {
+        stages = decoded
+      }
+      if
+        let data = defaults.data(forKey: todosStorageKey),
+        let decoded = try? decoder.decode([TodoItem].self, from: data)
+      {
+        todos = notionOnlyTodos(decoded)
+      }
+      if
+        let data = defaults.data(forKey: queueStorageKey),
+        let decoded = try? decoder.decode([PendingNotionOperation].self, from: data)
+      {
+        pendingOperations = decoded
+      }
+      persist(immediateDatabase: true)
     }
-    if let todoData = try? encoder.encode(todos) {
-      defaults.set(todoData, forKey: todosStorageKey)
-    }
+    refreshDerivedState()
+    stageRepository?.replaceStages(stages)
+    todoRepository?.replaceTodos(todos)
+    defaults.set(lastSuccessfulNotionSyncDate, forKey: lastSuccessfulSyncDateKey)
     if let queueData = try? encoder.encode(pendingOperations) {
       defaults.set(queueData, forKey: queueStorageKey)
     }
+    bumpRevisions(stageChanged: true, todoChanged: true, metricsChanged: true)
+    WidgetSnapshotSync.syncStagesAndTodos(stages: stages, todos: todos)
+  }
+
+  private func persist(
+    immediateDatabase: Bool = false,
+    stageChanged: Bool = true,
+    todoChanged: Bool = true,
+    metricsChanged: Bool = true,
+    preferDeltaWrite: Bool = false,
+    upsertedStages: [Stage] = [],
+    deletedStageIDs: Set<String> = [],
+    upsertedTodos: [TodoItem] = [],
+    deletedTodoIDs: Set<String> = []
+  ) {
+    stages.sort { $0.updatedAt > $1.updatedAt }
+    if metricsChanged || stageChanged {
+      refreshDerivedState()
+    } else if todoChanged {
+      sortedTodos = todos.sorted { $0.dueDate < $1.dueDate }
+    }
+
+    let snapshot = StageStoreSnapshot(
+      stages: stages,
+      todos: todos,
+      pendingOperations: pendingOperations,
+      lastSuccessfulNotionSyncDate: lastSuccessfulNotionSyncDate
+    )
+    defaults.set(lastSuccessfulNotionSyncDate, forKey: lastSuccessfulSyncDateKey)
+    if let queueData = try? encoder.encode(pendingOperations) {
+      defaults.set(queueData, forKey: queueStorageKey)
+    }
+    if immediateDatabase {
+      if preferDeltaWrite {
+        if !deletedStageIDs.isEmpty {
+          stageRepository?.deleteStages(ids: deletedStageIDs)
+        }
+        if !upsertedStages.isEmpty {
+          stageRepository?.upsertStages(upsertedStages)
+        }
+        if !deletedTodoIDs.isEmpty {
+          if let stageRepository {
+            stageRepository.deleteTodos(ids: deletedTodoIDs)
+          } else {
+            todoRepository?.deleteTodos(ids: deletedTodoIDs)
+          }
+        }
+        if !upsertedTodos.isEmpty {
+          if let stageRepository {
+            stageRepository.upsertTodos(upsertedTodos)
+          } else {
+            todoRepository?.upsertTodos(upsertedTodos)
+          }
+        }
+      } else {
+        stageRepository?.replaceStages(snapshot.stages)
+        todoRepository?.replaceTodos(snapshot.todos)
+      }
+      bumpRevisions(stageChanged: stageChanged, todoChanged: todoChanged, metricsChanged: metricsChanged)
+    }
+    persistenceScheduler.schedule {
+      let start = CFAbsoluteTimeGetCurrent()
+      StageStoreCache.save(snapshot)
+      if !immediateDatabase {
+        self.stageRepository?.replaceStages(snapshot.stages)
+        self.todoRepository?.replaceTodos(snapshot.todos)
+        Task { @MainActor in
+          self.bumpRevisions(stageChanged: stageChanged, todoChanged: todoChanged, metricsChanged: metricsChanged)
+        }
+      }
+      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+      PerformanceMonitor.recordPersistence(label: "StageStore.persist", durationMs: durationMs)
+    }
+
+    WidgetSnapshotSync.syncStagesAndTodos(stages: snapshot.stages, todos: snapshot.todos)
+  }
+
+  private func bumpRevisions(stageChanged: Bool, todoChanged: Bool, metricsChanged: Bool) {
+    if stageChanged {
+      stageRevision &+= 1
+    }
+    if todoChanged {
+      todoRevision &+= 1
+    }
+    if metricsChanged {
+      metricsRevision &+= 1
+    }
+    dataRevision &+= 1
   }
 
   private var shouldSyncAtLaunch: Bool {
@@ -639,10 +770,6 @@ final class StageStore: ObservableObject {
       return true
     }
     return Date().timeIntervalSince(lastSuccessfulNotionSyncDate) >= launchSyncStaleInterval
-  }
-
-  private func persistSyncMetadata() {
-    defaults.set(lastSuccessfulNotionSyncDate, forKey: lastSuccessfulSyncDateKey)
   }
 
   private func enqueue(_ operation: PendingNotionOperation) {
@@ -659,11 +786,175 @@ final class StageStore: ObservableObject {
       pendingOperations.append(operation)
     }
     pendingOperations.sort { $0.createdAt < $1.createdAt }
-    persist()
+    persist(stageChanged: false, todoChanged: false, metricsChanged: true)
   }
 
   private func isLikelyNotionPageID(_ value: String) -> Bool {
     value.range(of: #"[0-9a-fA-F]{32}"#, options: .regularExpression) != nil ||
       value.range(of: #"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"#, options: .regularExpression) != nil
+  }
+
+  private func updateNotionPageID(for stageID: String, notionPageID: String) {
+    guard !notionPageID.isEmpty else { return }
+    guard let index = stages.firstIndex(where: { $0.id == stageID }) else { return }
+    guard stages[index].notionPageID != notionPageID else { return }
+    stages[index].notionPageID = notionPageID
+    persist(
+      stageChanged: true,
+      todoChanged: false,
+      metricsChanged: false,
+      preferDeltaWrite: true,
+      upsertedStages: [stages[index]]
+    )
+  }
+
+  private func notionPageID(for stage: Stage) -> String? {
+    if let notionPageID = stage.notionPageID, !notionPageID.isEmpty {
+      return notionPageID
+    }
+    if stage.source == "notion", isLikelyNotionPageID(stage.id) {
+      return stage.id
+    }
+    return nil
+  }
+
+  private var shouldUseIncrementalLaunchSync: Bool {
+    guard let lastSuccessfulNotionSyncDate else { return false }
+    let elapsed = Date().timeIntervalSince(lastSuccessfulNotionSyncDate)
+    return elapsed < 6 * 60 * 60
+  }
+
+  private func reconcileFullNotionRefresh(_ remoteStages: [Stage]) {
+    let remotePageIDs = Set(remoteStages.map { $0.notionPageID ?? $0.id })
+    stages.removeAll { existing in
+      guard existing.source == "notion" else { return false }
+      let pageID = existing.notionPageID ?? existing.id
+      return !remotePageIDs.contains(pageID)
+    }
+    remoteStages.forEach { remote in
+      _ = upsertLocalStage(remote)
+    }
+    stages.sort { $0.updatedAt > $1.updatedAt }
+  }
+
+  private func refreshDerivedState() {
+    sortedTodos = todos.sorted { $0.dueDate < $1.dueDate }
+
+    let now = Date()
+    let weekStart = now.startOfWeekMonday()
+    var nextStatusCounts: [StageStatus: Int] = [:]
+    var nextBlockers: [StageBlocker] = []
+    var nextIssues: [StageQualityIssue] = []
+    nextIssues.reserveCapacity(stages.count * 2)
+    var addedCount = 0
+    var appliedCount = 0
+
+    for stage in stages {
+      nextStatusCounts[stage.status, default: 0] += 1
+      if stage.createdAt >= weekStart {
+        addedCount += 1
+      }
+      if stage.status == .applied && stage.updatedAt >= weekStart {
+        appliedCount += 1
+      }
+
+      let stagnantDays = Calendar.current.dateComponents([.day], from: stage.updatedAt, to: now).day ?? 0
+      if stage.status == .open && stagnantDays > 7 {
+        nextBlockers.append(
+          StageBlocker(
+            stage: stage,
+            stagnantDays: stagnantDays,
+            reason: "Ouvert > 7 jours",
+            suggestedStatus: .applied
+          )
+        )
+      }
+      if stage.status == .applied && stagnantDays > 10 {
+        nextBlockers.append(
+          StageBlocker(
+            stage: stage,
+            stagnantDays: stagnantDays,
+            reason: "Candidature > 10 jours sans update",
+            suggestedStatus: .interview
+          )
+        )
+      }
+
+      if stage.company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        nextIssues.append(
+          StageQualityIssue(
+            stage: stage,
+            field: .company,
+            suggestedValue: inferCompany(from: stage.url)
+          )
+        )
+      }
+      if stage.url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        nextIssues.append(
+          StageQualityIssue(
+            stage: stage,
+            field: .url,
+            suggestedValue: ""
+          )
+        )
+      }
+      if stage.deadline == nil {
+        nextIssues.append(
+          StageQualityIssue(
+            stage: stage,
+            field: .deadline,
+            suggestedValue: suggestDeadline(for: stage) ?? ""
+          )
+        )
+      }
+    }
+    statusCounts = StageStatus.allCases.reduce(into: [:]) { partialResult, status in
+      partialResult[status] = nextStatusCounts[status] ?? 0
+    }
+    blockers = nextBlockers.sorted { $0.stagnantDays > $1.stagnantDays }
+    qualityIssues = nextIssues
+
+    stageSearchIndex = Dictionary(uniqueKeysWithValues: stages.map { stage in
+      (
+        stage.id,
+        [
+          stage.title,
+          stage.company,
+          stage.status.rawValue,
+          stage.location,
+          stage.url,
+        ]
+        .joined(separator: " ")
+        .normalizedToken
+      )
+    })
+
+    let totalCount = stages.count
+    weeklyKPI = WeeklyStageKPI(
+      weekStart: weekStart,
+      addedCount: addedCount,
+      appliedCount: appliedCount,
+      totalCount: totalCount,
+      progressByStatus: StageStatus.allCases.map { status in
+        let count = nextStatusCounts[status] ?? 0
+        let ratio = totalCount > 0 ? Double(count) / Double(totalCount) : 0
+        return WeeklyStageProgress(status: status, count: count, ratio: ratio)
+      }
+    )
+  }
+
+  private func mergeRemoteTodos(_ remoteTodos: [TodoItem]) {
+    let notionTodos = notionOnlyTodos(remoteTodos)
+    let mergedByID = Dictionary(uniqueKeysWithValues: notionTodos.map { ($0.id, $0) })
+    todos = mergedByID.values.sorted { lhs, rhs in
+      if lhs.dueDate == rhs.dueDate {
+        return lhs.createdAt < rhs.createdAt
+      }
+      return lhs.dueDate < rhs.dueDate
+    }
+  }
+
+  private func notionOnlyTodos(_ items: [TodoItem]) -> [TodoItem] {
+    items.filter { $0.automationTag.hasPrefix("notion:") }
   }
 }

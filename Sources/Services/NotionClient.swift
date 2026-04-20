@@ -71,40 +71,58 @@ struct NotionClient {
     _ = try await notionRequest(token: token, path: "databases/\(dbID)", method: "GET", body: nil)
   }
 
-  func fetchStages(config: AppConfig) async throws -> [Stage] {
+  func fetchStages(config: AppConfig, updatedAfter: Date? = nil) async throws -> [Stage] {
     let token = config.notionToken.trimmingCharacters(in: .whitespacesAndNewlines)
     let dbID = normalizeDbId(config.notionDbId)
     guard !token.isEmpty else { throw NotionClientError.missingCredentials }
     guard !dbID.isEmpty else { throw NotionClientError.invalidDatabaseID }
 
-    let pages = try await queryDatabasePages(token: token, databaseID: dbID, limit: nil)
+    let pages = try await queryDatabasePages(
+      token: token,
+      databaseID: dbID,
+      limit: nil,
+      updatedAfter: updatedAfter
+    )
     return pages.compactMap { parseStage(from: $0, config: config) }
       .sorted { $0.updatedAt > $1.updatedAt }
   }
 
-  func upsertStage(_ stage: Stage, config: AppConfig) async throws {
+  func fetchTodos(config: AppConfig, stagePageIDToLocalID: [String: String]) async throws -> [TodoItem] {
+    let token = config.notionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let dbID = normalizeDbId(config.notionTodoDbId)
+    guard !token.isEmpty else { throw NotionClientError.missingCredentials }
+    guard !dbID.isEmpty else { return [] }
+
+    let pages = try await queryDatabasePages(
+      token: token,
+      databaseID: dbID,
+      limit: nil,
+      updatedAfter: nil
+    )
+    return pages.compactMap { parseTodo(from: $0, stagePageIDToLocalID: stagePageIDToLocalID) }
+      .sorted { $0.dueDate < $1.dueDate }
+  }
+
+  func upsertStage(_ stage: Stage, config: AppConfig, knownPageID: String? = nil) async throws -> String {
     let token = config.notionToken.trimmingCharacters(in: .whitespacesAndNewlines)
     let dbID = normalizeDbId(config.notionDbId)
     guard !token.isEmpty else { throw NotionClientError.missingCredentials }
     guard !dbID.isEmpty else { throw NotionClientError.invalidDatabaseID }
-
-    let pages = try await queryDatabasePages(token: token, databaseID: dbID, limit: nil)
-    let parsed = pages.compactMap { parseStage(from: $0, config: config) }
-    let existing = parsed.first(where: { isDuplicate($0, stage) })
 
     let schema = try await notionRequest(token: token, path: "databases/\(dbID)", method: "GET", body: nil)
     let properties = buildProperties(for: stage, schema: schema, config: config)
     guard !properties.isEmpty else { throw NotionClientError.noWritableProperties }
 
-    if let existing {
-      _ = try await notionRequest(
+    if let pageID = knownPageID?.trimmingCharacters(in: .whitespacesAndNewlines), !pageID.isEmpty {
+      let response = try await notionRequest(
         token: token,
-        path: "pages/\(existing.id)",
+        path: "pages/\(pageID)",
         method: "PATCH",
         body: ["properties": properties]
       )
+      return (response["id"] as? String) ?? pageID
     } else {
-      _ = try await notionRequest(
+      let response = try await notionRequest(
         token: token,
         path: "pages",
         method: "POST",
@@ -113,6 +131,10 @@ struct NotionClient {
           "properties": properties,
         ]
       )
+      guard let createdPageID = response["id"] as? String, !createdPageID.isEmpty else {
+        throw NotionClientError.invalidResponse
+      }
+      return createdPageID
     }
   }
 
@@ -250,7 +272,8 @@ struct NotionClient {
   private func queryDatabasePages(
     token: String,
     databaseID: String,
-    limit: Int?
+    limit: Int?,
+    updatedAfter: Date? = nil
   ) async throws -> [[String: Any]] {
     var rows: [[String: Any]] = []
     var cursor: String? = nil
@@ -258,8 +281,15 @@ struct NotionClient {
     while limit.map({ rows.count < $0 }) ?? true {
       let pageSize = limit.map { min(100, max(1, $0 - rows.count)) } ?? 100
       var body: [String: Any] = ["page_size": pageSize]
+      body["sorts"] = [["timestamp": "last_edited_time", "direction": "descending"]]
       if let cursor {
         body["start_cursor"] = cursor
+      }
+      if let updatedAfter {
+        body["filter"] = [
+          "timestamp": "last_edited_time",
+          "last_edited_time": ["after": updatedAfter.iso8601String]
+        ]
       }
 
       let response = try await notionRequest(
@@ -306,6 +336,7 @@ struct NotionClient {
 
     return Stage(
       id: id,
+      notionPageID: id,
       title: title.isEmpty ? "Stage" : title,
       company: company,
       url: url,
@@ -316,6 +347,58 @@ struct NotionClient {
       source: "notion",
       createdAt: createdAt,
       updatedAt: updatedAt
+    )
+  }
+
+  private func parseTodo(from page: [String: Any], stagePageIDToLocalID: [String: String]) -> TodoItem? {
+    let props = page["properties"] as? [String: Any] ?? [:]
+
+    let titleField =
+      property(namedAnyOf: ["Task", "Name", "Title", "Todo"], in: props) ??
+      firstTitleProperty(from: props)
+    let statusField =
+      property(namedAnyOf: ["Status", "Todo Status", "Etat", "État"], in: props) ??
+      firstProperty(ofType: "status", in: props) ??
+      firstProperty(ofType: "select", in: props)
+    let dueDateField =
+      property(namedAnyOf: ["Due Date", "Due", "Deadline", "Date", "When", "Echeance", "Échéance"], in: props) ??
+      firstProperty(ofType: "date", in: props)
+    let notesField =
+      property(namedAnyOf: ["Notes", "Description", "Details"], in: props) ??
+      firstProperty(ofType: "rich_text", in: props)
+    let relationField =
+      property(namedAnyOf: ["Stage", "Stages", "Opportunity", "Application", "Job"], in: props) ??
+      firstProperty(ofType: "relation", in: props)
+
+    let title = propertyText(titleField)
+    guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+
+    let statusRaw = propertyText(statusField).normalizedToken
+    let status: TodoStatus
+    if statusRaw.contains("done") || statusRaw.contains("term") || statusRaw.contains("fini") {
+      status = .done
+    } else if statusRaw.contains("progress") || statusRaw.contains("cours") {
+      status = .inProgress
+    } else {
+      status = .notStarted
+    }
+
+    let dueDate = propertyDate(dueDateField) ?? parseISODate(page["created_time"] as? String) ?? Date()
+    let notes = propertyText(notesField)
+    let relationPageIDs = propertyRelationIDs(relationField)
+    let relatedStageID = relationPageIDs.compactMap { stagePageIDToLocalID[$0] }.first ?? ""
+    let pageID = (page["id"] as? String) ?? UUID().uuidString
+    let createdAt = parseISODate(page["created_time"] as? String) ?? Date()
+
+    return TodoItem(
+      id: pageID,
+      title: title,
+      dueDate: dueDate,
+      status: status,
+      notes: notes,
+      relatedStageID: relatedStageID,
+      automationTag: "notion:\(pageID)",
+      createdAt: createdAt
     )
   }
 
@@ -441,6 +524,34 @@ struct NotionClient {
     }
     let text = propertyText(property)
     return parseISODate(text)
+  }
+
+  private func propertyRelationIDs(_ property: [String: Any]?) -> [String] {
+    guard let property else { return [] }
+    let type = property["type"] as? String ?? ""
+    guard type == "relation" else { return [] }
+    let relation = property["relation"] as? [[String: Any]] ?? []
+    return relation.compactMap { $0["id"] as? String }
+  }
+
+  private func property(namedAnyOf candidates: [String], in properties: [String: Any]) -> [String: Any]? {
+    let normalizedCandidates = Set(candidates.map(\.normalizedToken))
+    for (key, value) in properties {
+      guard normalizedCandidates.contains(key.normalizedToken) else { continue }
+      guard let property = value as? [String: Any] else { continue }
+      return property
+    }
+    return nil
+  }
+
+  private func firstProperty(ofType type: String, in properties: [String: Any]) -> [String: Any]? {
+    for (_, value) in properties {
+      guard let property = value as? [String: Any] else { continue }
+      if (property["type"] as? String) == type {
+        return property
+      }
+    }
+    return nil
   }
 
   private func firstTitleProperty(from properties: [String: Any]) -> [String: Any] {

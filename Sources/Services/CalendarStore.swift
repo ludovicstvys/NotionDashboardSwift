@@ -63,6 +63,13 @@ final class CalendarStore: ObservableObject {
   @Published var statusMessage: String = ""
   @Published var selectedCalendarIDs: Set<String> = []
   @Published private(set) var lastRefreshDate: Date?
+  @Published private(set) var groupedEvents: [CalendarEventGroup] = []
+  @Published private(set) var upcomingEvents: [CalendarEvent] = []
+  @Published private(set) var upcomingCount = 0
+  @Published private(set) var todayCount = 0
+  @Published private(set) var nextUpcomingEvent: CalendarEvent?
+  @Published private(set) var calendarRevision: Int = 0
+  @Published private(set) var dataRevision: Int = 0
 
   private let cacheStorageKey = "swift_notion_dashboard_calendar_cache_v2"
   private let defaults: UserDefaults
@@ -70,19 +77,26 @@ final class CalendarStore: ObservableObject {
   private let decoder: JSONDecoder
   private let icsService: ICSService
   private let googleService: GoogleCalendarService
+  private let persistenceScheduler = DebouncedWorkScheduler(
+    label: "com.loldashboard.notiondashboard.calendar-store-persist",
+    delay: 0.18
+  )
   private weak var configStore: ConfigStore?
   private weak var googleAuthStore: GoogleAuthStore?
   private weak var notificationScheduler: NotificationScheduler?
   private weak var diagnostics: DiagnosticsStore?
+  private let calendarRepository: CalendarRepository?
   private var isLoadingGoogleCalendars = false
   private var lastLoadedFutureDays: Int = 0
   private var lastIcalSource: String = ""
+  private var lastReminderSignature: Int?
 
   init(
     configStore: ConfigStore,
     googleAuthStore: GoogleAuthStore,
     notificationScheduler: NotificationScheduler?,
     diagnostics: DiagnosticsStore?,
+    calendarRepository: CalendarRepository? = nil,
     defaults: UserDefaults = .standard,
     icsService: ICSService = ICSService(),
     googleService: GoogleCalendarService = GoogleCalendarService()
@@ -91,6 +105,7 @@ final class CalendarStore: ObservableObject {
     self.googleAuthStore = googleAuthStore
     self.notificationScheduler = notificationScheduler
     self.diagnostics = diagnostics
+    self.calendarRepository = calendarRepository
     self.defaults = defaults
     self.icsService = icsService
     self.googleService = googleService
@@ -161,7 +176,7 @@ final class CalendarStore: ObservableObject {
     }
   }
 
-  func setCalendarSelected(calendarID: String, isSelected: Bool) {
+  func setCalendarSelected(calendarID: String, isSelected: Bool, icalURL: String? = nil) async {
     if isSelected {
       selectedCalendarIDs.insert(calendarID)
     } else {
@@ -170,6 +185,24 @@ final class CalendarStore: ObservableObject {
     configStore?.update { config in
       config.googleSelectedCalendarIDs = Array(selectedCalendarIDs).sorted()
     }
+    persistCache()
+    await refreshCombinedEvents(icalURL: icalURL, scope: .calendarScreen, force: true)
+  }
+
+  func handleGoogleSignOut(icalURL: String? = nil) async {
+    googleCalendars = []
+    selectedCalendarIDs = []
+    events.removeAll { $0.sourceType == .google }
+    lastRefreshDate = Date()
+    statusMessage = "Google disconnected."
+    configStore?.update { config in
+      config.googleSelectedCalendarIDs = []
+      config.googleDefaultCalendarID = ""
+    }
+    lastReminderSignature = nil
+    persistCache()
+    await maybeScheduleRemindersIfNeeded(prefs: configStore?.config.reminderPrefs ?? .defaults)
+    await refreshCombinedEvents(icalURL: icalURL, scope: .calendarScreen, force: true)
   }
 
   func loadCombinedEvents(icalURL: String?) async {
@@ -243,7 +276,7 @@ final class CalendarStore: ObservableObject {
     statusMessage = "\(prefix) | total: \(events.count)"
     diagnostics?.log(category: "calendar", message: statusMessage)
 
-    await notificationScheduler?.scheduleEventReminders(events: events, prefs: configStore.config.reminderPrefs)
+    await maybeScheduleRemindersIfNeeded(prefs: configStore.config.reminderPrefs)
   }
 
   func classifyEventType(summary: String, description: String, location: String) -> EventType {
@@ -265,7 +298,7 @@ final class CalendarStore: ObservableObject {
     copy.eventType = classifyEventType(summary: event.summary, description: event.description, location: event.location)
     applyEvents((events + [copy]).sorted { $0.start < $1.start }, iCalSource: lastIcalSource, scope: .calendarScreen)
     if let prefs = configStore?.config.reminderPrefs {
-      await notificationScheduler?.scheduleEventReminders(events: events, prefs: prefs)
+      await maybeScheduleRemindersIfNeeded(prefs: prefs)
     }
   }
 
@@ -375,10 +408,30 @@ final class CalendarStore: ObservableObject {
     iCalSource: String,
     scope: CalendarRefreshScope
   ) {
+    let previous = events.reduce(into: [String: CalendarEvent]()) { partialResult, event in
+      partialResult[event.id] = event
+    }
+    let next = loadedEvents.reduce(into: [String: CalendarEvent]()) { partialResult, event in
+      partialResult[event.id] = event
+    }
+    let deletedIDs = Set(previous.keys).subtracting(next.keys)
+    let upsertedEvents = next.compactMap { key, value -> CalendarEvent? in
+      guard previous[key] != value else { return nil }
+      return value
+    }
+
     events = loadedEvents
     lastRefreshDate = Date()
     lastLoadedFutureDays = max(lastLoadedFutureDays, scope.futureDays)
     lastIcalSource = iCalSource
+    refreshDerivedState()
+    if !deletedIDs.isEmpty {
+      calendarRepository?.deleteEvents(ids: deletedIDs)
+    }
+    if !upsertedEvents.isEmpty {
+      calendarRepository?.upsertEvents(upsertedEvents)
+    }
+    bumpCalendarRevision()
     persistCache()
   }
 
@@ -395,6 +448,10 @@ final class CalendarStore: ObservableObject {
     lastRefreshDate = snapshot.lastRefreshDate
     lastLoadedFutureDays = snapshot.loadedFutureDays
     lastIcalSource = snapshot.lastIcalSource
+    refreshDerivedState()
+    calendarRepository?.replaceEvents(events)
+    bumpCalendarRevision()
+    WidgetSnapshotSync.syncEvents(events)
   }
 
   private func persistCache() {
@@ -405,7 +462,77 @@ final class CalendarStore: ObservableObject {
       loadedFutureDays: lastLoadedFutureDays,
       lastIcalSource: lastIcalSource
     )
-    guard let data = try? encoder.encode(snapshot) else { return }
-    defaults.set(data, forKey: cacheStorageKey)
+    let defaults = self.defaults
+    let cacheStorageKey = self.cacheStorageKey
+    let events = self.events
+    persistenceScheduler.schedule {
+      let start = CFAbsoluteTimeGetCurrent()
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      encoder.dateEncodingStrategy = .iso8601
+      guard let data = try? encoder.encode(snapshot) else { return }
+      defaults.set(data, forKey: cacheStorageKey)
+      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+      PerformanceMonitor.recordPersistence(label: "CalendarStore.persistCache", durationMs: durationMs)
+    }
+    WidgetSnapshotSync.syncEvents(events)
+  }
+
+  private func refreshDerivedState() {
+    let calendar = Calendar.current
+    let now = Date()
+    let threshold = now.addingTimeInterval(-3_600)
+    var nextUpcoming: [CalendarEvent] = []
+    var nextUpcomingCount = 0
+    var nextTodayCount = 0
+    var grouped: [Date: [CalendarEvent]] = [:]
+    grouped.reserveCapacity(max(events.count / 2, 8))
+
+    for event in events {
+      if event.end >= now {
+        nextUpcomingCount += 1
+      }
+      if calendar.isDateInToday(event.start) {
+        nextTodayCount += 1
+      }
+      if event.end >= threshold {
+        nextUpcoming.append(event)
+      }
+      let day = calendar.startOfDay(for: event.start)
+      grouped[day, default: []].append(event)
+    }
+
+    upcomingEvents = nextUpcoming
+    upcomingCount = nextUpcomingCount
+    todayCount = nextTodayCount
+    nextUpcomingEvent = nextUpcoming.first
+    groupedEvents = grouped.keys.sorted().map { day in
+      CalendarEventGroup(day: day, items: grouped[day] ?? [])
+    }
+  }
+
+  private func maybeScheduleRemindersIfNeeded(prefs: ReminderPrefs) async {
+    let signature = remindersSignature(events: events, prefs: prefs)
+    guard signature != lastReminderSignature else { return }
+    lastReminderSignature = signature
+    await notificationScheduler?.scheduleEventReminders(events: events, prefs: prefs)
+  }
+
+  private func remindersSignature(events: [CalendarEvent], prefs: ReminderPrefs) -> Int {
+    var hasher = Hasher()
+    hasher.combine(prefs)
+    hasher.combine(events.count)
+    for event in events {
+      hasher.combine(event.id)
+      hasher.combine(event.start.timeIntervalSince1970)
+      hasher.combine(event.end.timeIntervalSince1970)
+      hasher.combine(event.eventType.rawValue)
+    }
+    return hasher.finalize()
+  }
+
+  private func bumpCalendarRevision() {
+    calendarRevision &+= 1
+    dataRevision &+= 1
   }
 }
