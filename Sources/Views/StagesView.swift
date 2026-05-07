@@ -14,7 +14,6 @@ struct StagesView: View {
       GeometryReader { proxy in
         let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
         VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
-          overviewPanel(metrics: metrics)
           commandBar
           listAndDetailBoard(width: proxy.size.width)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -56,7 +55,6 @@ struct StagesView: View {
         let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
         ScrollView {
           VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
-            overviewPanel(metrics: metrics)
             commandBar
             listAndDetailBoard(width: proxy.size.width)
           }
@@ -95,7 +93,7 @@ struct StagesView: View {
   }
 
   private func overviewPanel(metrics: WorkspaceLayoutMetrics) -> some View {
-    WorkspacePanel(tint: WorkspacePalette.accentSoft, padding: metrics.regularPanelPadding) {
+    WorkspaceHeroPanel(tint: WorkspacePalette.accentSoft, padding: metrics.regularPanelPadding) {
       VStack(alignment: .leading, spacing: metrics.panelGap) {
         HStack(alignment: .top, spacing: metrics.panelGap) {
           VStack(alignment: .leading, spacing: 10) {
@@ -104,11 +102,11 @@ struct StagesView: View {
               .tracking(1.8)
               .foregroundStyle(Color.white.opacity(0.70))
 
-            Text("Scan the pipeline.\nInspect one record.")
+            Text("Pipeline overview.\nDecision-ready.")
               .font(.system(size: metrics.sizeClass == .wide ? 38 : 33, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
 
-            Text("Stages now follows a cleaner desktop layout: a fast list on the left, a focused detail panel on the right.")
+            Text("Track every opportunity with a fast index, clear status signals, and a focused detail panel.")
               .font(.subheadline)
               .foregroundStyle(Color.white.opacity(0.72))
           }
@@ -136,21 +134,21 @@ struct StagesView: View {
     let metrics = WorkspaceLayoutMetrics(width: width)
 #if os(macOS)
     if metrics.sizeClass == .wide {
-      HSplitView {
+      HStack(alignment: .top, spacing: metrics.panelGap) {
         listPanel
-          .frame(minWidth: 360, idealWidth: 430, maxWidth: 520)
+          .frame(minWidth: 360, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity, alignment: .top)
         detailPanel
-          .frame(minWidth: 420)
+          .frame(minWidth: 360, maxWidth: .infinity, minHeight: 640, maxHeight: .infinity, alignment: .top)
       }
-      .frame(minHeight: 640)
+      .frame(maxWidth: .infinity, minHeight: 640, maxHeight: .infinity, alignment: .top)
     } else {
-      VStack(alignment: .leading, spacing: metrics.panelGap) {
+      VStack(alignment: .leading, spacing: 24) {
         listPanel
         detailPanel
       }
     }
 #else
-    VStack(alignment: .leading, spacing: metrics.panelGap) {
+    VStack(alignment: .leading, spacing: 24) {
       listPanel
       detailPanel
     }

@@ -78,7 +78,8 @@ struct NotionStatusMap: Codable, Hashable {
 }
 
 struct AppConfig: Codable, Hashable {
-  static let defaultGoogleOAuthClientID = "608348086080-dp8647muci5st4em00pdgvrba75jq3db.apps.googleusercontent.com"
+  static let defaultGoogleOAuthClientID = ""
+  static let defaultGoogleOAuthClientSecret = ""
 
   var notionToken: String = ""
   var notionDbId: String = ""
@@ -86,7 +87,8 @@ struct AppConfig: Codable, Hashable {
   var bdfApiKey: String = ""
   var googlePlacesApiKey: String = ""
   var googleOAuthClientID: String = AppConfig.defaultGoogleOAuthClientID
-  var googleOAuthRedirectURI: String = AppConfig.recommendedGoogleOAuthRedirectURI(for: AppConfig.defaultGoogleOAuthClientID)
+  var googleOAuthClientSecret: String = AppConfig.defaultGoogleOAuthClientSecret
+  var googleOAuthRedirectURI: String = ""
   var googleOAuthScopes: [String] = [
     "https://www.googleapis.com/auth/calendar.readonly",
     "https://www.googleapis.com/auth/calendar.events",
@@ -122,28 +124,6 @@ struct AppConfig: Codable, Hashable {
 
   static var defaults: AppConfig { .init() }
 
-  static func recommendedGoogleOAuthScheme(for clientID: String) -> String? {
-    let trimmed = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
-    let suffix = ".apps.googleusercontent.com"
-    guard trimmed.hasSuffix(suffix) else { return nil }
-    let prefix = String(trimmed.dropLast(suffix.count))
-    guard !prefix.isEmpty else { return nil }
-    return "com.googleusercontent.apps.\(prefix)"
-  }
-
-  static func recommendedGoogleOAuthRedirectURI(for clientID: String) -> String {
-    guard let scheme = recommendedGoogleOAuthScheme(for: clientID) else {
-      return ""
-    }
-    return "\(scheme):/oauth2redirect"
-  }
-
-  static func usesManagedGoogleOAuthRedirectURI(_ redirectURI: String, clientID: String) -> Bool {
-    let trimmed = redirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ||
-      trimmed == recommendedGoogleOAuthRedirectURI(for: clientID)
-  }
-
   var hasNotionCredentials: Bool {
     !notionToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
       !notionDbId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -151,7 +131,7 @@ struct AppConfig: Codable, Hashable {
 
   var hasGoogleOAuthCredentials: Bool {
     !googleOAuthClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-      !googleOAuthRedirectURI.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      !googleOAuthClientSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   func wipLimit(for status: StageStatus) -> Int {
@@ -165,6 +145,7 @@ struct AppConfig: Codable, Hashable {
     case bdfApiKey
     case googlePlacesApiKey
     case googleOAuthClientID
+    case googleOAuthClientSecret
     case googleOAuthRedirectURI
     case googleOAuthScopes
     case googleAccessToken
@@ -195,8 +176,9 @@ struct AppConfig: Codable, Hashable {
     bdfApiKey = try c.decodeIfPresent(String.self, forKey: .bdfApiKey) ?? ""
     googlePlacesApiKey = try c.decodeIfPresent(String.self, forKey: .googlePlacesApiKey) ?? ""
     googleOAuthClientID = try c.decodeIfPresent(String.self, forKey: .googleOAuthClientID) ?? AppConfig.defaultGoogleOAuthClientID
-    googleOAuthRedirectURI = try c.decodeIfPresent(String.self, forKey: .googleOAuthRedirectURI) ??
-      AppConfig.recommendedGoogleOAuthRedirectURI(for: googleOAuthClientID)
+    googleOAuthClientSecret = try c.decodeIfPresent(String.self, forKey: .googleOAuthClientSecret) ??
+      AppConfig.defaultGoogleOAuthClientSecret
+    googleOAuthRedirectURI = try c.decodeIfPresent(String.self, forKey: .googleOAuthRedirectURI) ?? ""
     googleOAuthScopes = try c.decodeIfPresent([String].self, forKey: .googleOAuthScopes) ?? [
       "https://www.googleapis.com/auth/calendar.readonly",
       "https://www.googleapis.com/auth/calendar.events",
@@ -229,6 +211,7 @@ struct AppConfig: Codable, Hashable {
     try c.encode(bdfApiKey, forKey: .bdfApiKey)
     try c.encode(googlePlacesApiKey, forKey: .googlePlacesApiKey)
     try c.encode(googleOAuthClientID, forKey: .googleOAuthClientID)
+    try c.encode(googleOAuthClientSecret, forKey: .googleOAuthClientSecret)
     try c.encode(googleOAuthRedirectURI, forKey: .googleOAuthRedirectURI)
     try c.encode(googleOAuthScopes, forKey: .googleOAuthScopes)
     try c.encode(googleAccessToken, forKey: .googleAccessToken)
@@ -288,6 +271,15 @@ struct TodoItem: Identifiable, Codable, Hashable {
   var relatedStageID: String
   var automationTag: String
   var createdAt: Date
+}
+
+struct TodoEditorDraft: Hashable {
+  var id: String = ""
+  var title: String = ""
+  var dueDate: Date = .now
+  var status: TodoStatus = .notStarted
+  var notes: String = ""
+  var relatedStageID: String = ""
 }
 
 struct WeeklyStageProgress: Hashable {
@@ -538,4 +530,6 @@ struct GoogleCalendarDescriptor: Identifiable, Codable, Hashable {
   var id: String
   var name: String
   var isPrimary: Bool
+  var backgroundColor: String?
+  var foregroundColor: String?
 }

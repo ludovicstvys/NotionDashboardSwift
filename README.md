@@ -66,13 +66,12 @@ The generated DMG contains:
 
 ## Google OAuth setup
 
-1. In Google Cloud Console, create an OAuth client for installed apps.
-2. Add the app callback used by the current client ID: `com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db:/oauth2redirect`.
-3. In Settings tab, set:
-   - `Google OAuth client ID`
-   - `Google OAuth redirect URI`
-   - scopes if needed
-4. Click `Connect Google`.
+1. In Google Cloud Console, create an OAuth client with application type `Desktop app`.
+2. Enable the Google Calendar API for the same Google Cloud project.
+3. Set the app's desktop OAuth client ID and client secret in `AppConfig` if you create a new Google Cloud client.
+4. Launch the app and click `Connect Google` in Settings.
+
+The app uses the desktop loopback OAuth flow and opens Google sign-in in the system browser. Do not configure a custom Google redirect URI in the app.
 
 ## Security note
 

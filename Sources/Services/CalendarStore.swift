@@ -51,6 +51,7 @@ private struct CalendarCacheSnapshot: Codable {
   var events: [CalendarEvent]
   var googleCalendars: [GoogleCalendarDescriptor]
   var lastRefreshDate: Date?
+  var lastGoogleRefreshDate: Date?
   var loadedFutureDays: Int
   var lastIcalSource: String
 }
@@ -63,6 +64,7 @@ final class CalendarStore: ObservableObject {
   @Published var statusMessage: String = ""
   @Published var selectedCalendarIDs: Set<String> = []
   @Published private(set) var lastRefreshDate: Date?
+  @Published private(set) var lastGoogleRefreshDate: Date?
   @Published private(set) var groupedEvents: [CalendarEventGroup] = []
   @Published private(set) var upcomingEvents: [CalendarEvent] = []
   @Published private(set) var upcomingCount = 0
@@ -121,9 +123,13 @@ final class CalendarStore: ObservableObject {
     self.decoder = decoder
 
     loadCache()
+    WidgetSnapshotSync.syncEventsImmediately(events)
   }
 
   func prepareForLaunch(icalURL: String?) async {
+    if googleAuthStore?.isAuthenticated == true, googleCalendars.isEmpty {
+      await loadGoogleCalendars(force: false)
+    }
     await refreshCombinedEvents(icalURL: icalURL, scope: .launch, force: false)
   }
 
@@ -163,6 +169,7 @@ final class CalendarStore: ObservableObject {
       let calendars = try await googleService.listCalendars(accessToken: token)
       googleCalendars = calendars
       hydrateSelectedCalendars(from: calendars)
+      lastGoogleRefreshDate = Date()
       persistCache()
       statusMessage = "Google calendars loaded (\(calendars.count))."
       diagnostics?.log(category: "calendar-google", message: statusMessage)
@@ -194,6 +201,7 @@ final class CalendarStore: ObservableObject {
     selectedCalendarIDs = []
     events.removeAll { $0.sourceType == .google }
     lastRefreshDate = Date()
+    lastGoogleRefreshDate = nil
     statusMessage = "Google disconnected."
     configStore?.update { config in
       config.googleSelectedCalendarIDs = []
@@ -236,12 +244,17 @@ final class CalendarStore: ObservableObject {
 
     var merged: [CalendarEvent] = []
     var fragments: [String] = []
+    var didAttemptSource = false
+    var didLoadSource = false
 
     switch resolvedICS {
     case let .success(items):
+      didAttemptSource = true
+      didLoadSource = true
       merged.append(contentsOf: items)
       fragments.append("iCal: \(items.count)")
     case let .failure(error):
+      didAttemptSource = true
       fragments.append("iCal error")
       diagnostics?.log(
         severity: .warning,
@@ -255,9 +268,12 @@ final class CalendarStore: ObservableObject {
 
     switch resolvedGoogle {
     case let .success(items):
+      didAttemptSource = true
+      didLoadSource = true
       merged.append(contentsOf: items)
       fragments.append("Google: \(items.count)")
     case let .failure(error):
+      didAttemptSource = true
       fragments.append("Google error")
       diagnostics?.log(
         severity: .warning,
@@ -267,6 +283,13 @@ final class CalendarStore: ObservableObject {
       )
     case .none:
       break
+    }
+
+    if didAttemptSource, !didLoadSource {
+      let prefix = fragments.isEmpty ? "Source error." : fragments.joined(separator: " | ")
+      statusMessage = "\(prefix) | keeping cached: \(events.count)"
+      diagnostics?.log(category: "calendar", message: statusMessage)
+      return
     }
 
     let normalized = merged.sorted { $0.start < $1.start }
@@ -346,6 +369,84 @@ final class CalendarStore: ObservableObject {
         message: statusMessage
       )
     }
+  }
+
+  func updateGoogleEvent(
+    event: CalendarEvent,
+    summary: String,
+    location: String,
+    description: String,
+    start: Date,
+    end: Date
+  ) async {
+    guard event.sourceType == .google else {
+      statusMessage = "Only Google events can be edited."
+      return
+    }
+    guard let configStore else { return }
+    do {
+      let token = try await googleAuthStore?.validAccessToken() ?? ""
+      guard !token.isEmpty else {
+        statusMessage = "Google auth required."
+        return
+      }
+      let calendarID = event.calendarName.isEmpty ? resolvedDefaultCalendarID() : event.calendarName
+      try await googleService.updateEvent(
+        accessToken: token,
+        calendarID: calendarID,
+        eventID: event.id,
+        summary: summary,
+        location: location,
+        description: description,
+        start: start,
+        end: end
+      )
+      statusMessage = "Google event updated."
+      diagnostics?.log(category: "calendar-google", message: statusMessage, metadata: ["eventID": event.id])
+      await refreshCombinedEvents(
+        icalURL: configStore.config.externalIcalUrl,
+        scope: .calendarScreen,
+        force: true
+      )
+    } catch {
+      statusMessage = "Google update event error: \(error.localizedDescription)"
+      diagnostics?.log(severity: .warning, category: "calendar-google", message: statusMessage)
+    }
+  }
+
+  func deleteGoogleEvent(_ event: CalendarEvent) async {
+    guard event.sourceType == .google else {
+      statusMessage = "Only Google events can be deleted."
+      return
+    }
+    guard let configStore else { return }
+    do {
+      let token = try await googleAuthStore?.validAccessToken() ?? ""
+      guard !token.isEmpty else {
+        statusMessage = "Google auth required."
+        return
+      }
+      let calendarID = event.calendarName.isEmpty ? resolvedDefaultCalendarID() : event.calendarName
+      try await googleService.deleteEvent(accessToken: token, calendarID: calendarID, eventID: event.id)
+      statusMessage = "Google event deleted."
+      diagnostics?.log(category: "calendar-google", message: statusMessage, metadata: ["eventID": event.id])
+      await refreshCombinedEvents(
+        icalURL: configStore.config.externalIcalUrl,
+        scope: .calendarScreen,
+        force: true
+      )
+    } catch {
+      statusMessage = "Google delete event error: \(error.localizedDescription)"
+      diagnostics?.log(severity: .warning, category: "calendar-google", message: statusMessage)
+    }
+  }
+
+  private func resolvedDefaultCalendarID() -> String {
+    guard let configStore else { return "primary" }
+    if !configStore.config.googleDefaultCalendarID.isEmpty {
+      return configStore.config.googleDefaultCalendarID
+    }
+    return googleCalendars.first(where: \.isPrimary)?.id ?? "primary"
   }
 
   private func shouldRefresh(scope: CalendarRefreshScope, iCalSource: String) -> Bool {
@@ -436,22 +537,60 @@ final class CalendarStore: ObservableObject {
   }
 
   private func loadCache() {
-    guard
-      let data = defaults.data(forKey: cacheStorageKey),
-      let snapshot = try? decoder.decode(CalendarCacheSnapshot.self, from: data)
-    else {
+    let stored = loadCacheSnapshot(from: defaults.data(forKey: cacheStorageKey))
+    let legacy = loadCacheSnapshot(from: LegacyPreferences.data(forKey: cacheStorageKey))
+    guard let snapshot = preferredCacheSnapshot(current: stored, legacy: legacy) else {
       return
     }
+    let shouldPersistMigratedCache = shouldPersistCacheSnapshot(current: stored, selected: snapshot)
 
     events = snapshot.events.sorted { $0.start < $1.start }
     googleCalendars = snapshot.googleCalendars
     lastRefreshDate = snapshot.lastRefreshDate
+    lastGoogleRefreshDate = snapshot.lastGoogleRefreshDate
     lastLoadedFutureDays = snapshot.loadedFutureDays
     lastIcalSource = snapshot.lastIcalSource
     refreshDerivedState()
     calendarRepository?.replaceEvents(events)
     bumpCalendarRevision()
-    WidgetSnapshotSync.syncEvents(events)
+    WidgetSnapshotSync.syncEventsImmediately(events)
+    if shouldPersistMigratedCache {
+      persistCache()
+    }
+  }
+
+  private func loadCacheSnapshot(from data: Data?) -> CalendarCacheSnapshot? {
+    guard let data else { return nil }
+    return try? decoder.decode(CalendarCacheSnapshot.self, from: data)
+  }
+
+  private func preferredCacheSnapshot(
+    current: CalendarCacheSnapshot?,
+    legacy: CalendarCacheSnapshot?
+  ) -> CalendarCacheSnapshot? {
+    guard let legacy else { return current }
+    guard let current else { return legacy }
+    if current.events.isEmpty, !legacy.events.isEmpty {
+      return legacy
+    }
+    if current.googleCalendars.isEmpty, !legacy.googleCalendars.isEmpty {
+      return legacy
+    }
+    return current
+  }
+
+  private func shouldPersistCacheSnapshot(
+    current: CalendarCacheSnapshot?,
+    selected: CalendarCacheSnapshot
+  ) -> Bool {
+    guard let current else { return true }
+    if current.events.isEmpty, !selected.events.isEmpty {
+      return true
+    }
+    if current.googleCalendars.isEmpty, !selected.googleCalendars.isEmpty {
+      return true
+    }
+    return false
   }
 
   private func persistCache() {
@@ -459,6 +598,7 @@ final class CalendarStore: ObservableObject {
       events: events,
       googleCalendars: googleCalendars,
       lastRefreshDate: lastRefreshDate,
+      lastGoogleRefreshDate: lastGoogleRefreshDate,
       loadedFutureDays: lastLoadedFutureDays,
       lastIcalSource: lastIcalSource
     )
@@ -475,7 +615,32 @@ final class CalendarStore: ObservableObject {
       let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
       PerformanceMonitor.recordPersistence(label: "CalendarStore.persistCache", durationMs: durationMs)
     }
-    WidgetSnapshotSync.syncEvents(events)
+    WidgetSnapshotSync.syncEventsImmediately(events)
+  }
+
+  var googleSyncSummary: String {
+    guard googleAuthStore?.isAuthenticated == true else { return "Google not connected" }
+    if googleCalendars.isEmpty {
+      return "Google connected, calendars not loaded"
+    }
+    let selectedCount = selectedCalendarIDs.isEmpty ? googleCalendars.count : selectedCalendarIDs.count
+    let loadStamp = lastGoogleRefreshDate?.shortDateTime ?? "not loaded yet"
+    return "\(selectedCount) calendars selected, \(loadStamp)"
+  }
+
+  var sourceSummary: String {
+    var parts: [String] = []
+    if googleAuthStore?.isAuthenticated == true {
+      parts.append("Google")
+    }
+    if let configStore, !configStore.config.externalIcalUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      parts.append("iCal")
+    }
+    return parts.isEmpty ? "No sources connected" : parts.joined(separator: " + ")
+  }
+
+  func eventCount(for calendarID: String) -> Int {
+    events.filter { $0.sourceType == .google && $0.calendarName == calendarID }.count
   }
 
   private func refreshDerivedState() {

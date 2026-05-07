@@ -173,6 +173,89 @@ struct NotionClient {
     )
   }
 
+  func updateTodoStatus(pageID: String, status: TodoStatus, config: AppConfig) async throws {
+    let token = config.notionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let dbID = normalizeDbId(config.notionTodoDbId)
+    guard !token.isEmpty else { throw NotionClientError.missingCredentials }
+    guard !dbID.isEmpty else { throw NotionClientError.invalidDatabaseID }
+    guard isLikelyNotionID(pageID) else { throw NotionClientError.invalidPageID }
+
+    let schema = try await notionRequest(token: token, path: "databases/\(dbID)", method: "GET", body: nil)
+    let schemaProps = schema["properties"] as? [String: Any] ?? [:]
+    let statusField = propertyName(namedAnyOf: ["Status", "Todo Status", "Etat", "État"], in: schemaProps)
+      ?? firstPropertyName(ofType: "status", in: schemaProps)
+      ?? firstPropertyName(ofType: "select", in: schemaProps)
+      ?? "Status"
+    guard
+      let statusSchema = schemaProps[statusField] as? [String: Any],
+      let type = statusSchema["type"] as? String
+    else {
+      throw NotionClientError.noWritableProperties
+    }
+
+    let value: [String: Any]
+    switch type {
+    case "status":
+      value = ["status": ["name": status.rawValue]]
+    case "select":
+      value = ["select": ["name": status.rawValue]]
+    default:
+      value = ["rich_text": [["text": ["content": status.rawValue]]]]
+    }
+
+    _ = try await notionRequest(
+      token: token,
+      path: "pages/\(pageID)",
+      method: "PATCH",
+      body: ["properties": [statusField: value]]
+    )
+  }
+
+  func updateTodo(
+    _ todo: TodoItem,
+    config: AppConfig,
+    knownPageID: String? = nil,
+    relatedStagePageID: String? = nil
+  ) async throws -> String {
+    let token = config.notionToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let dbID = normalizeDbId(config.notionTodoDbId)
+    guard !token.isEmpty else { throw NotionClientError.missingCredentials }
+    guard !dbID.isEmpty else { throw NotionClientError.invalidDatabaseID }
+
+    let schema = try await notionRequest(token: token, path: "databases/\(dbID)", method: "GET", body: nil)
+    let properties = buildTodoProperties(
+      for: todo,
+      schema: schema,
+      config: config,
+      relatedStagePageID: relatedStagePageID
+    )
+    guard !properties.isEmpty else { throw NotionClientError.noWritableProperties }
+
+    if let pageID = knownPageID?.trimmingCharacters(in: .whitespacesAndNewlines), !pageID.isEmpty {
+      let response = try await notionRequest(
+        token: token,
+        path: "pages/\(pageID)",
+        method: "PATCH",
+        body: ["properties": properties]
+      )
+      return (response["id"] as? String) ?? pageID
+    } else {
+      let response = try await notionRequest(
+        token: token,
+        path: "pages",
+        method: "POST",
+        body: [
+          "parent": ["database_id": dbID],
+          "properties": properties,
+        ]
+      )
+      guard let createdPageID = response["id"] as? String, !createdPageID.isEmpty else {
+        throw NotionClientError.invalidResponse
+      }
+      return createdPageID
+    }
+  }
+
   private func notionRequest(
     token: String,
     path: String,
@@ -468,6 +551,83 @@ struct NotionClient {
     return properties
   }
 
+  private func buildTodoProperties(
+    for todo: TodoItem,
+    schema: [String: Any],
+    config: AppConfig,
+    relatedStagePageID: String? = nil
+  ) -> [String: Any] {
+    let schemaProps = schema["properties"] as? [String: Any] ?? [:]
+    var properties: [String: Any] = [:]
+
+    let titleField = propertyName(namedAnyOf: ["Task", "Name", "Title", "Todo"], in: schemaProps)
+      ?? firstTitlePropertyName(from: schemaProps)
+
+    func propertyType(_ key: String) -> String? {
+      (schemaProps[key] as? [String: Any])?["type"] as? String
+    }
+
+    func setText(_ key: String, value: String) {
+      guard !key.isEmpty else { return }
+      guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+      guard let type = propertyType(key) else { return }
+      switch type {
+      case "title":
+        properties[key] = ["title": [["text": ["content": value]]]]
+      case "rich_text":
+        properties[key] = ["rich_text": [["text": ["content": value]]]]
+      case "select":
+        properties[key] = ["select": ["name": value]]
+      default:
+        break
+      }
+    }
+
+    if !titleField.isEmpty {
+      setText(titleField, value: todo.title)
+    }
+
+    if let statusField = propertyName(namedAnyOf: ["Status", "Todo Status", "Etat", "État"], in: schemaProps) {
+      switch propertyType(statusField) {
+      case "status":
+        properties[statusField] = ["status": ["name": todo.status.rawValue]]
+      case "select":
+        properties[statusField] = ["select": ["name": todo.status.rawValue]]
+      case "rich_text":
+        properties[statusField] = ["rich_text": [["text": ["content": todo.status.rawValue]]]]
+      default:
+        break
+      }
+    }
+
+    if let dueDateField = propertyName(namedAnyOf: ["Due Date", "Due", "Deadline", "Date", "When", "Echeance", "Échéance"], in: schemaProps) {
+      if propertyType(dueDateField) == "date" {
+        properties[dueDateField] = ["date": ["start": iso8601DateFormatter.string(from: todo.dueDate)]]
+      }
+    }
+
+    if let notesField = propertyName(namedAnyOf: ["Notes", "Description", "Details"], in: schemaProps) {
+      if propertyType(notesField) == "rich_text" {
+        properties[notesField] = ["rich_text": [["text": ["content": todo.notes]]]]
+      }
+    }
+
+    if let relationField = propertyName(namedAnyOf: ["Stage", "Stages", "Opportunity", "Application", "Job"], in: schemaProps),
+       propertyType(relationField) == "relation",
+       let relatedStagePageID,
+       !relatedStagePageID.isEmpty {
+      properties[relationField] = ["relation": [["id": relatedStagePageID]]]
+    }
+
+    return properties
+  }
+
+  private var iso8601DateFormatter: ISO8601DateFormatter {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }
+
   private func parseISODate(_ raw: String?) -> Date? {
     guard let raw else { return nil }
     if let value = Date.iso8601WithFractionalSeconds.date(from: raw) {
@@ -513,6 +673,16 @@ struct NotionClient {
     default:
       return ""
     }
+  }
+
+  private func propertyName(namedAnyOf names: [String], in props: [String: Any]) -> String? {
+    names.first(where: { props[$0] != nil })
+  }
+
+  private func firstPropertyName(ofType type: String, in props: [String: Any]) -> String? {
+    props.first { _, value in
+      (value as? [String: Any])?["type"] as? String == type
+    }?.key
   }
 
   private func propertyDate(_ property: [String: Any]?) -> Date? {

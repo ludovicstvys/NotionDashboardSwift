@@ -8,8 +8,11 @@ struct DashboardView: View {
   @EnvironmentObject private var calendarStore: CalendarStore
   @EnvironmentObject private var configStore: ConfigStore
   @EnvironmentObject private var googleAuthStore: GoogleAuthStore
+  @EnvironmentObject private var focusStore: FocusStore
 
   @State private var selectedEvent: CalendarEvent?
+  @State private var selectedTodo: TodoItem?
+  @State private var createTodoDraft = false
 
   var body: some View {
     NavigationStack {
@@ -19,7 +22,6 @@ struct DashboardView: View {
           ScrollView {
             LazyVStack(alignment: .leading, spacing: metrics.sectionSpacing) {
               mastheadPanel(width: proxy.size.width, metrics: metrics)
-              homeCommandBar
               todayBoard(metrics: metrics)
               supportGrid(metrics: metrics)
             }
@@ -54,12 +56,71 @@ struct DashboardView: View {
         }
         .presentationDetents([.medium, .large])
       }
+      .sheet(item: $selectedTodo) { todo in
+        NavigationStack {
+          TodoEditorView(
+            todo: todo,
+            stages: stageStore.stages,
+            allowsDelete: true,
+            onSave: { title, dueDate, notes, relatedStageID, status in
+              Task {
+                await stageStore.updateTodo(
+                  todoID: todo.id,
+                  title: title,
+                  dueDate: dueDate,
+                  notes: notes,
+                  relatedStageID: relatedStageID,
+                  status: status
+                )
+              }
+            },
+            onDelete: {
+              stageStore.deleteTodo(todoID: todo.id)
+            }
+          )
+          .navigationTitle("Edit todo")
+        }
+        .presentationDetents([.medium, .large])
+      }
+      .sheet(isPresented: $createTodoDraft) {
+        NavigationStack {
+          let draftID = UUID().uuidString
+          TodoEditorView(
+            todo: TodoItem(
+              id: draftID,
+              title: "",
+              dueDate: .now,
+              status: .notStarted,
+              notes: "",
+              relatedStageID: "",
+              automationTag: "local:\(draftID)",
+              createdAt: .now
+            ),
+            stages: stageStore.stages,
+            allowsDelete: false,
+            onSave: { title, dueDate, notes, relatedStageID, status in
+              Task {
+                await stageStore.createTodo(
+                  title: title,
+                  dueDate: dueDate,
+                  notes: notes,
+                  relatedStageID: relatedStageID,
+                  status: status
+                )
+              }
+            },
+            onDelete: {}
+          )
+          .navigationTitle("New todo")
+        }
+        .presentationDetents([.medium, .large])
+      }
     }
     .instrumentedScreen("DashboardView")
   }
 
   private func mastheadPanel(width: CGFloat, metrics: WorkspaceLayoutMetrics) -> some View {
-    return dashboardPanel(tint: WorkspacePalette.accent, padding: metrics.regularPanelPadding) {
+    return WorkspaceHeroPanel(tint: WorkspacePalette.accent, padding: metrics.regularPanelPadding) {
       VStack(alignment: .leading, spacing: 24) {
         if metrics.sizeClass != .compact {
           HStack(alignment: .top, spacing: 24) {
@@ -93,38 +154,6 @@ struct DashboardView: View {
     }
   }
 
-  private var homeCommandBar: some View {
-    WorkspaceCommandBar(
-      title: "Workspace",
-      subtitle: "Refresh quietly, sync when needed, and keep the page focused on what matters today."
-    ) {
-      Button {
-        Task { await refreshDashboard(force: true) }
-      } label: {
-        Label("Refresh", systemImage: "arrow.clockwise")
-      }
-      .buttonStyle(.borderedProminent)
-      .tint(WorkspacePalette.accent)
-
-      Button {
-        Task { await stageStore.syncFromNotion() }
-      } label: {
-        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-      }
-      .buttonStyle(.bordered)
-
-      WorkspaceBadge(
-        text: googleAuthStore.isAuthenticated ? "Calendar connected" : "Calendar offline",
-        tint: googleAuthStore.isAuthenticated ? WorkspacePalette.success : WorkspacePalette.warning
-      )
-
-      WorkspaceBadge(
-        text: configStore.config.focusModeEnabled ? "Focus on" : "Focus off",
-        tint: configStore.config.focusModeEnabled ? WorkspacePalette.accent : .white
-      )
-    }
-  }
-
   private func mastheadCopy(width: CGFloat) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       Image("DashboardLogo")
@@ -133,12 +162,12 @@ struct DashboardView: View {
         .frame(width: width >= 980 ? 86 : 72)
         .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
 
-      Text("HOME CONTROL")
+      Text("TODAY")
         .font(.caption2.weight(.bold))
         .tracking(1.8)
         .foregroundStyle(Color.white.opacity(0.70))
 
-      Text(width >= 980 ? "A cleaner view of\nyour day." : "A cleaner view of your day.")
+      Text(width >= 980 ? "Your operating system\nfor today." : "Your operating system for today.")
         .font(.system(size: width >= 1_120 ? 46 : 38, weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
         .fixedSize(horizontal: false, vertical: true)
@@ -147,7 +176,7 @@ struct DashboardView: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.white.opacity(0.80))
 
-      Text("The dashboard is now centered on three things only: the next event, the next todo, and a compact operational snapshot.")
+      Text("Calendar, todos, pipeline and market signals in one focused command center.")
         .font(.subheadline)
         .foregroundStyle(Color.white.opacity(0.72))
         .fixedSize(horizontal: false, vertical: true)
@@ -288,12 +317,23 @@ struct DashboardView: View {
 
   private var todoColumn: some View {
     VStack(alignment: .leading, spacing: 14) {
-      boardHeader(
-        title: "Todo",
-        subtitle: "Deadlines and pipeline follow-ups",
-        accent: WorkspacePalette.warning,
-        countText: "\(openTodoCount) open"
-      )
+      HStack(alignment: .top, spacing: 12) {
+        boardHeader(
+          title: "Todo",
+          subtitle: "Deadlines and pipeline follow-ups",
+          accent: WorkspacePalette.warning,
+          countText: "\(openTodoCount) open"
+        )
+        Spacer(minLength: 0)
+        Button {
+          createTodoDraft = true
+        } label: {
+          Label("New todo", systemImage: "plus")
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+        .tint(WorkspacePalette.warning)
+      }
 
       if dashboardViewModel.state.visibleTodos.isEmpty {
         emptyState(
@@ -317,89 +357,85 @@ struct DashboardView: View {
   }
 
   private func supportGrid(metrics: WorkspaceLayoutMetrics) -> some View {
-    LazyVGrid(columns: supportColumns(for: metrics), alignment: .leading, spacing: metrics.panelGap) {
-      overviewPanel
+    let supportCardHeight: CGFloat = 390
+    return LazyVGrid(columns: supportColumns(for: metrics), alignment: .leading, spacing: metrics.panelGap) {
+      focusPanel
+        .frame(height: supportCardHeight, alignment: .topLeading)
       marketsPanel
+        .frame(height: supportCardHeight, alignment: .topLeading)
       newsPanel
+        .frame(height: supportCardHeight, alignment: .topLeading)
     }
   }
 
-  private var overviewPanel: some View {
-    let kpi = dashboardViewModel.state.weeklyKPI
-
-    return dashboardPanel(title: "Pipeline overview", subtitle: "Status distribution and weekly cadence", tint: WorkspacePalette.accentSoft) {
+  private var focusPanel: some View {
+    dashboardPanel(title: "Focus", subtitle: "Pomodoro guardrails and blocked distractions", tint: .pink) {
       VStack(alignment: .leading, spacing: 16) {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-          compactMetric(title: "Open", value: "\(count(for: .open))", tint: statusColor(.open))
-          compactMetric(title: "Applied", value: "\(count(for: .applied))", tint: statusColor(.applied))
-          compactMetric(title: "Interview", value: "\(count(for: .interview))", tint: statusColor(.interview))
-          compactMetric(title: "Rejected", value: "\(count(for: .rejected))", tint: statusColor(.rejected))
+        HStack(alignment: .lastTextBaseline, spacing: 12) {
+          Text(focusStore.isEnabled ? focusTimeText : "Ready")
+            .font(.system(size: 34, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+          Text(focusStore.focusSummary)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(focusStore.isEnabled ? WorkspacePalette.accentSoft : WorkspacePalette.subtleText)
         }
 
-        subtleDivider
+        ProgressView(value: focusProgress)
+          .tint(.pink)
 
-        VStack(alignment: .leading, spacing: 10) {
-      overviewLine(label: "Added this week", value: "\(kpi.addedCount)")
-      overviewLine(label: "Applied this week", value: "\(kpi.appliedCount)")
-      overviewLine(label: "Pending queue", value: "\(dashboardViewModel.state.pendingQueueCount)")
-        }
-
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(kpi.progressByStatus, id: \.status) { item in
-            VStack(alignment: .leading, spacing: 5) {
-              HStack {
-                Text(item.status.rawValue)
-                  .font(.caption.weight(.semibold))
-                Spacer()
-                Text("\(item.count) · \(Int(item.ratio * 100))%")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
-              }
-              GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                  Capsule()
-                    .fill(Color.white.opacity(0.08))
-                  Capsule()
-                    .fill(statusColor(item.status).opacity(0.85))
-                    .frame(width: max(proxy.size.width * item.ratio, item.count == 0 ? 0 : 10))
-                }
-              }
-              .frame(height: 8)
-            }
+        HStack(spacing: 10) {
+          Button(focusStore.isEnabled ? "Restart" : "Start focus") {
+            focusStore.startSession()
           }
+          .buttonStyle(.borderedProminent)
+          .tint(.pink)
+
+          Button(focusStore.isPaused ? "Resume" : "Pause") {
+            focusStore.togglePause()
+          }
+          .buttonStyle(.bordered)
+          .disabled(!focusStore.isEnabled)
+
+          Button("Stop") {
+            focusStore.stopSession()
+          }
+          .buttonStyle(.bordered)
+          .disabled(!focusStore.isEnabled)
         }
+
+        Text(configStore.config.urlBlockerRules.isEmpty ? "No blocked websites configured." : "\(configStore.config.urlBlockerRules.count) blocked rule(s) active.")
+          .font(.caption)
+          .foregroundStyle(WorkspacePalette.subtleText)
       }
     }
     .workspaceAlignedCard(minHeight: 390)
   }
 
   private var marketsPanel: some View {
-    dashboardPanel(title: "Markets", subtitle: "Configured symbols from Yahoo Finance", tint: WorkspacePalette.success) {
-      VStack(alignment: .leading, spacing: 12) {
+    dashboardPanel(title: "Markets", subtitle: "Same compact readout style as the widgets", tint: WorkspacePalette.success) {
+      VStack(alignment: .leading, spacing: 14) {
         if marketNewsStore.quotes.isEmpty {
-          Text(marketNewsStore.isLoadingQuotes ? "Loading quotes..." : "No market quote available.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          WorkspaceEmptyState(
+            title: marketNewsStore.isLoadingQuotes ? "Loading quotes" : "No market quote",
+            message: marketNewsStore.isLoadingQuotes ? "Fetching Yahoo Finance data." : "Enable markets or configure symbols in Settings.",
+            tint: WorkspacePalette.success,
+            systemImage: "chart.line.uptrend.xyaxis"
+          )
         } else {
-          ForEach(marketNewsStore.quotes.prefix(5)) { quote in
-            HStack {
-              VStack(alignment: .leading, spacing: 2) {
-                Text(quote.shortName)
-                  .font(.subheadline.weight(.semibold))
-                Text(quote.symbol)
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-              }
-              Spacer()
-              VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "%.2f", quote.price))
-                  .font(.subheadline.weight(.bold))
-                Text(String(format: "%+.2f%%", quote.changePercent))
-                  .font(.caption)
-                  .foregroundStyle(quote.changePercent >= 0 ? WorkspacePalette.success : Color.red)
-              }
+          if let leadQuote = marketNewsStore.quotes.first {
+            marketLeadQuote(leadQuote)
+          }
+
+          VStack(alignment: .leading, spacing: 8) {
+            ForEach(marketNewsStore.quotes.dropFirst().prefix(4)) { quote in
+              marketQuoteRow(quote)
             }
-            .padding(.vertical, 3)
+          }
+
+          if let lastRefresh = marketNewsStore.lastRefreshDate {
+            Text("Updated \(lastRefresh.formatted(.relative(presentation: .named)))")
+              .font(.caption2)
+              .foregroundStyle(WorkspacePalette.subtleText)
           }
         }
       }
@@ -411,45 +447,172 @@ struct DashboardView: View {
     DashboardNewsPanel()
   }
 
+  private var focusTimeText: String {
+    let minutes = max(0, focusStore.remainingSeconds) / 60
+    let seconds = max(0, focusStore.remainingSeconds) % 60
+    return String(format: "%02d:%02d", minutes, seconds)
+  }
+
+  private var focusProgress: Double {
+    guard focusStore.isEnabled else { return 0 }
+    let totalMinutes = focusStore.focusSummary == "Focus break"
+      ? configStore.config.pomodoroBreakMinutes
+      : configStore.config.pomodoroWorkMinutes
+    let total = max(1, totalMinutes * 60)
+    return 1 - min(1, Double(max(0, focusStore.remainingSeconds)) / Double(total))
+  }
+
+  private func marketLeadQuote(_ quote: MarketQuote) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: 5) {
+          Text(quote.symbol)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(WorkspacePalette.success)
+          Text(quote.shortName)
+            .font(.headline)
+            .foregroundStyle(.white)
+            .lineLimit(2)
+        }
+
+        Spacer(minLength: 0)
+
+        Text(marketDirectionLabel(for: quote))
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(marketTint(for: quote))
+          .padding(.horizontal, 8)
+          .padding(.vertical, 5)
+          .background(marketTint(for: quote).opacity(0.16))
+          .clipShape(Capsule())
+      }
+
+      HStack(alignment: .lastTextBaseline, spacing: 10) {
+        Text(marketPriceText(for: quote))
+          .font(.system(size: 34, weight: .bold, design: .rounded))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+          .minimumScaleFactor(0.72)
+        Text(marketPercentText(for: quote))
+          .font(.headline.weight(.bold))
+          .foregroundStyle(marketTint(for: quote))
+      }
+
+      Text("Market time \(quote.marketTime.formatted(date: .omitted, time: .shortened))")
+        .font(.caption)
+        .foregroundStyle(WorkspacePalette.subtleText)
+    }
+    .padding(16)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      LinearGradient(
+        colors: [
+          WorkspacePalette.success.opacity(0.20),
+          WorkspacePalette.innerCard,
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    )
+    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .stroke(WorkspacePalette.success.opacity(0.18), lineWidth: 1)
+    }
+  }
+
+  private func marketQuoteRow(_ quote: MarketQuote) -> some View {
+    HStack(spacing: 10) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(quote.symbol)
+          .font(.caption.weight(.bold))
+          .foregroundStyle(.white)
+        Text(quote.shortName)
+          .font(.caption2)
+          .foregroundStyle(WorkspacePalette.subtleText)
+          .lineLimit(1)
+      }
+
+      Spacer(minLength: 8)
+
+      VStack(alignment: .trailing, spacing: 2) {
+        Text(marketPriceText(for: quote))
+          .font(.caption.weight(.bold))
+          .foregroundStyle(.white)
+        Text(marketPercentText(for: quote))
+          .font(.caption2.weight(.bold))
+          .foregroundStyle(marketTint(for: quote))
+      }
+    }
+    .padding(10)
+    .background(WorkspacePalette.innerCard)
+    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+  }
+
+  private func marketPriceText(for quote: MarketQuote) -> String {
+    if quote.price >= 1_000 {
+      return quote.price.formatted(.number.precision(.fractionLength(0...2)))
+    }
+    return quote.price.formatted(.number.precision(.fractionLength(2)))
+  }
+
+  private func marketPercentText(for quote: MarketQuote) -> String {
+    quote.changePercent.formatted(.number.sign(strategy: .always()).precision(.fractionLength(2))) + "%"
+  }
+
+  private func marketDirectionLabel(for quote: MarketQuote) -> String {
+    quote.changePercent >= 0 ? "UP" : "DOWN"
+  }
+
+  private func marketTint(for quote: MarketQuote) -> Color {
+    quote.changePercent >= 0 ? WorkspacePalette.success : WorkspacePalette.danger
+  }
+
   private func agendaTimelineRow(_ event: CalendarEvent, isLast: Bool) -> some View {
     Button {
       selectedEvent = event
     } label: {
-      HStack(alignment: .top, spacing: 14) {
-        VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .top, spacing: 16) {
+        VStack(alignment: .leading, spacing: 6) {
           Text(event.start.formatted(.dateTime.weekday(.abbreviated)))
             .font(.caption2.weight(.bold))
-            .foregroundStyle(Color.white.opacity(0.64))
+            .tracking(0.6)
+            .foregroundStyle(Color.white.opacity(0.56))
           Text(event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()))
-            .font(.system(size: 18, weight: .bold, design: .rounded))
+            .font(.system(size: 22, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
           Text(event.end.formatted(.dateTime.hour().minute()))
-            .font(.caption)
-            .foregroundStyle(Color.white.opacity(0.58))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.white.opacity(0.48))
         }
-        .frame(width: 72, alignment: .leading)
+        .frame(width: 80, alignment: .leading)
+        .padding(.vertical, 4)
 
-        VStack(alignment: .leading, spacing: 6) {
-          HStack(alignment: .top) {
-            Text(event.summary.isEmpty ? "Event" : event.summary)
-              .font(.headline)
-              .foregroundStyle(.white)
-              .lineLimit(2)
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text(event.summary.isEmpty ? "Event" : event.summary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+              Text(event.whenText)
+                .font(.caption2)
+                .foregroundStyle(Color.white.opacity(0.58))
+            }
+
             Spacer(minLength: 8)
-            Text(eventTypeLabel(for: event.eventType))
-              .font(.caption2.weight(.bold))
-              .padding(.horizontal, 9)
-              .padding(.vertical, 5)
-              .background(eventTypeColor(for: event.eventType).opacity(0.20))
-              .foregroundStyle(eventTypeColor(for: event.eventType))
-              .clipShape(Capsule())
+
+            VStack(alignment: .trailing, spacing: 4) {
+              Text(eventTypeLabel(for: event.eventType))
+                .font(.caption2.weight(.bold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(eventTypeColor(for: event.eventType).opacity(0.22))
+                .foregroundStyle(eventTypeColor(for: event.eventType))
+                .clipShape(Capsule())
+            }
           }
 
-          Text(event.whenText)
-            .font(.caption)
-            .foregroundStyle(Color.white.opacity(0.68))
-
-          HStack(spacing: 8) {
+          HStack(spacing: 6) {
             if !event.calendarName.isEmpty {
               detailChip(text: event.calendarName, tint: WorkspacePalette.accent)
             }
@@ -460,14 +623,22 @@ struct DashboardView: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.vertical, 6)
-      .overlay(alignment: .bottom) {
-        if !isLast {
-          Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .frame(height: 1)
-            .padding(.leading, 86)
-        }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .background(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .fill(LinearGradient(
+            colors: [
+              eventTypeColor(for: event.eventType).opacity(0.12),
+              Color.white.opacity(0.04)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ))
+      )
+      .overlay {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .stroke(Color.white.opacity(0.08), lineWidth: 1)
       }
     }
     .buttonStyle(.plain)
@@ -476,68 +647,139 @@ struct DashboardView: View {
   private func todoQueueRow(_ todo: TodoItem, isLast: Bool, isHighlighted: Bool) -> some View {
     let isOverdue = todo.status != .done && todo.dueDate < Calendar.current.startOfDay(for: Date())
 
-    return HStack(alignment: .top, spacing: 14) {
-      VStack(alignment: .leading, spacing: 4) {
-        Text(todo.dueDate.formatted(.dateTime.day().month(.abbreviated)))
-          .font(.system(size: 18, weight: .bold, design: .rounded))
-          .foregroundStyle(isOverdue ? Color.red : Color.white)
-        Text(todo.status == .done ? "Closed" : (isOverdue ? "Overdue" : "Due"))
-          .font(.caption2.weight(.bold))
-          .foregroundStyle(isOverdue ? Color.red : Color.white.opacity(0.64))
-      }
-      .frame(width: 72, alignment: .leading)
-
-      VStack(alignment: .leading, spacing: 6) {
-        Text(todo.title)
-          .font(.headline)
-          .foregroundStyle(.white)
-          .lineLimit(2)
-
-        Text(todoSubtitle(for: todo))
-          .font(.caption)
-          .foregroundStyle(Color.white.opacity(0.68))
-
-        if let label = stageLabel(for: todo), !label.isEmpty {
-          detailChip(text: label, tint: WorkspacePalette.warning)
+    return HStack(alignment: .center, spacing: 16) {
+        VStack(alignment: .center, spacing: 4) {
+          Text(todo.dueDate.formatted(.dateTime.day()))
+            .font(.system(size: 20, weight: .bold, design: .rounded))
+            .foregroundStyle(isOverdue ? Color.red : Color.white)
+          Text(todo.dueDate.formatted(.dateTime.month(.abbreviated)))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isOverdue ? Color.red.opacity(0.8) : Color.white.opacity(0.56))
         }
-      }
+        .frame(width: 64, alignment: .center)
+        .padding(12)
+        .background(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(isOverdue
+              ? Color.red.opacity(0.12)
+              : todoStatusColor(todo.status).opacity(0.12))
+        )
+        .overlay {
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(isOverdue
+              ? Color.red.opacity(0.2)
+              : todoStatusColor(todo.status).opacity(0.2), lineWidth: 1)
+        }
 
-      Spacer(minLength: 10)
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+              Text(todo.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
 
-      Menu {
-        ForEach(TodoStatus.allCases) { status in
-          Button(status.rawValue) {
-            stageStore.setTodoStatus(todoID: todo.id, status: status)
+              Text(todoSubtitle(for: todo))
+                .font(.caption2)
+                .foregroundStyle(Color.white.opacity(0.56))
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 0) {
+              Menu {
+                ForEach(TodoStatus.allCases) { status in
+                  Button(status.rawValue) {
+                    stageStore.setTodoStatus(todoID: todo.id, status: status)
+                  }
+                }
+              } label: {
+                HStack(spacing: 4) {
+                  Text(todo.status.rawValue)
+                    .font(.caption2.weight(.bold))
+                  Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(todoStatusColor(todo.status).opacity(0.18))
+                .foregroundStyle(todoStatusColor(todo.status))
+                .clipShape(Capsule())
+              }
+              .buttonStyle(.plain)
+            }
+          }
+
+          HStack(spacing: 8) {
+            if let label = stageLabel(for: todo), !label.isEmpty {
+              detailChip(text: label, tint: WorkspacePalette.warning)
+            }
+            Spacer(minLength: 0)
+            editTodoButton(todo)
           }
         }
-      } label: {
-        Text(todo.status.rawValue)
-          .font(.caption.weight(.bold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 7)
-          .background(todoStatusColor(todo.status).opacity(0.18))
-          .foregroundStyle(todoStatusColor(todo.status))
-          .clipShape(Capsule())
-      }
+
+        Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.vertical, 6)
+    .padding(16)
     .background(
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(isHighlighted ? Color.white.opacity(0.06) : Color.clear)
+        .fill(LinearGradient(
+          colors: [
+            todoStatusColor(todo.status).opacity(isHighlighted ? 0.14 : 0.08),
+            Color.white.opacity(isHighlighted ? 0.06 : 0.02)
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        ))
     )
     .overlay {
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(isHighlighted ? WorkspacePalette.warning.opacity(0.28) : Color.clear, lineWidth: 1.5)
+        .stroke(
+          isHighlighted
+            ? todoStatusColor(todo.status).opacity(0.40)
+            : Color.white.opacity(0.06),
+          lineWidth: isHighlighted ? 1.5 : 1
+        )
     }
-    .overlay(alignment: .bottom) {
-      if !isLast {
-        Rectangle()
-          .fill(Color.white.opacity(0.08))
-          .frame(height: 1)
-          .padding(.leading, 86)
+    .contentShape(Rectangle())
+    .onTapGesture { selectedTodo = todo }
+  }
+
+  private func editTodoButton(_ todo: TodoItem) -> some View {
+    Button {
+      selectedTodo = todo
+    } label: {
+      HStack(spacing: 7) {
+        Image(systemName: "square.and.pencil")
+          .font(.caption.weight(.bold))
+        Text("Edit")
+          .font(.caption.weight(.bold))
       }
+      .foregroundStyle(.white)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(
+        Capsule(style: .continuous)
+          .fill(LinearGradient(
+            colors: [
+              WorkspacePalette.accent.opacity(0.36),
+              Color.white.opacity(0.12)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ))
+      )
+      .overlay {
+        Capsule(style: .continuous)
+          .stroke(WorkspacePalette.accent.opacity(0.38), lineWidth: 1)
+      }
+      .shadow(color: WorkspacePalette.accent.opacity(0.18), radius: 10, x: 0, y: 5)
     }
+    .buttonStyle(.plain)
+    .contentShape(Capsule())
+    .help("Edit todo")
   }
 
   private var connectionBadge: some View {
@@ -631,31 +873,6 @@ struct DashboardView: View {
       .clipShape(Capsule())
   }
 
-  private func compactMetric(title: String, value: String, tint: Color) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(title)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Text(value)
-        .font(.title3.weight(.bold))
-        .foregroundStyle(tint)
-    }
-    .padding(14)
-    .workspaceAlignedCard(minHeight: 88)
-    .workspaceInteractiveSurface(cornerRadius: 16, tint: tint, raised: false)
-  }
-
-  private func overviewLine(label: String, value: String) -> some View {
-    HStack {
-      Text(label)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Spacer()
-      Text(value)
-        .font(.subheadline.weight(.semibold))
-    }
-  }
-
   private func emptyState(title: String, message: String) -> some View {
     WorkspaceEmptyState(title: title, message: message, tint: .teal)
   }
@@ -694,12 +911,6 @@ struct DashboardView: View {
       .frame(width: isVertical ? 1 : nil, height: isVertical ? nil : 1)
   }
 
-  private var subtleDivider: some View {
-    Rectangle()
-      .fill(Color.white.opacity(0.08))
-      .frame(height: 1)
-  }
-
   private func supportColumns(for metrics: WorkspaceLayoutMetrics) -> [GridItem] {
     if metrics.sizeClass == .wide {
       return [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
@@ -717,23 +928,6 @@ struct DashboardView: View {
   private func todoSubtitle(for todo: TodoItem) -> String {
     let prefix = todo.dueDate < Calendar.current.startOfDay(for: Date()) && todo.status != .done ? "Overdue" : "Due"
     return "\(prefix): \(todo.dueDate.shortDate)"
-  }
-
-  private func count(for status: StageStatus) -> Int {
-    dashboardViewModel.state.statusCounts[status] ?? 0
-  }
-
-  private func statusColor(_ status: StageStatus) -> Color {
-    switch status {
-    case .open:
-      return WorkspacePalette.accent
-    case .applied:
-      return WorkspacePalette.success
-    case .interview:
-      return WorkspacePalette.warning
-    case .rejected:
-      return .red
-    }
   }
 
   private func todoStatusColor(_ status: TodoStatus) -> Color {
@@ -849,6 +1043,82 @@ struct DashboardView: View {
   }
 }
 
+private struct TodoEditorView: View {
+  let todo: TodoItem
+  let stages: [Stage]
+  let allowsDelete: Bool
+  let onSave: (_ title: String, _ dueDate: Date, _ notes: String, _ relatedStageID: String, _ status: TodoStatus) -> Void
+  let onDelete: () -> Void
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var title: String
+  @State private var dueDate: Date
+  @State private var notes: String
+  @State private var relatedStageID: String
+  @State private var status: TodoStatus
+
+  init(
+    todo: TodoItem,
+    stages: [Stage],
+    allowsDelete: Bool,
+    onSave: @escaping (_ title: String, _ dueDate: Date, _ notes: String, _ relatedStageID: String, _ status: TodoStatus) -> Void,
+    onDelete: @escaping () -> Void
+  ) {
+    self.todo = todo
+    self.stages = stages
+    self.allowsDelete = allowsDelete
+    self.onSave = onSave
+    self.onDelete = onDelete
+    _title = State(initialValue: todo.title)
+    _dueDate = State(initialValue: todo.dueDate)
+    _notes = State(initialValue: todo.notes)
+    _relatedStageID = State(initialValue: todo.relatedStageID)
+    _status = State(initialValue: todo.status)
+  }
+
+  var body: some View {
+    Form {
+      Section("Todo") {
+        TextField("Title", text: $title)
+        DatePicker("Due date", selection: $dueDate, displayedComponents: [.date])
+        Picker("Status", selection: $status) {
+          ForEach(TodoStatus.allCases) { status in
+            Text(status.rawValue).tag(status)
+          }
+        }
+      }
+
+      Section("Context") {
+        Picker("Related stage", selection: $relatedStageID) {
+          Text("None").tag("")
+          ForEach(stages) { stage in
+            Text(stage.displayLabel.isEmpty ? "Stage" : stage.displayLabel).tag(stage.id)
+          }
+        }
+        TextEditor(text: $notes)
+          .frame(minHeight: 120)
+      }
+
+      Section {
+        Button("Save changes") {
+          onSave(title, dueDate, notes, relatedStageID, status)
+          dismiss()
+        }
+        .buttonStyle(.borderedProminent)
+
+        if allowsDelete {
+          Button(role: .destructive) {
+            onDelete()
+            dismiss()
+          } label: {
+            Text("Delete todo")
+          }
+        }
+      }
+    }
+  }
+}
+
 private struct DashboardFocusSessionBadge: View {
   @EnvironmentObject private var focusStore: FocusStore
 
@@ -880,7 +1150,8 @@ private struct DashboardNewsPanel: View {
           .foregroundStyle(Color.white.opacity(0.66))
       }
 
-      VStack(alignment: .leading, spacing: 12) {
+      ScrollView(.vertical, showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 12) {
         if marketNewsStore.news.isEmpty {
           Text(marketNewsStore.isLoadingNews ? "Loading headlines..." : "No headline available.")
             .font(.caption)
@@ -897,10 +1168,10 @@ private struct DashboardNewsPanel: View {
                   .foregroundStyle(.secondary)
               }
               Spacer()
-              ProtectedLinkButton(title: "Open", systemImage: "link", urlString: item.link, tint: WorkspacePalette.accent)
             }
             .padding(.vertical, 2)
           }
+        }
         }
       }
     }

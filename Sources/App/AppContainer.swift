@@ -10,6 +10,7 @@ final class AppContainer: ObservableObject {
   let googleAuthStore: GoogleAuthStore
   let notificationScheduler: NotificationScheduler
   let focusStore: FocusStore
+  let focusLocalServer: FocusLocalServer
   let stageStore: StageStore
   let calendarStore: CalendarStore
   let marketNewsStore: MarketNewsStore
@@ -31,10 +32,11 @@ final class AppContainer: ObservableObject {
     self.updateStore = UpdateStore(diagnostics: diagnostics)
     let auth = GoogleAuthStore(configStore: config, diagnostics: diagnostics)
     self.googleAuthStore = auth
-    let focus = FocusStore(configStore: config, diagnostics: diagnostics)
-    self.focusStore = focus
-    let notificationScheduler = NotificationScheduler(diagnostics: diagnostics, focusStore: focus)
+    let notificationScheduler = NotificationScheduler(diagnostics: diagnostics)
     self.notificationScheduler = notificationScheduler
+    let focus = FocusStore(configStore: config, diagnostics: diagnostics, notificationScheduler: notificationScheduler)
+    self.focusStore = focus
+    self.focusLocalServer = FocusLocalServer(focusStore: focus, configStore: config, diagnostics: diagnostics)
     let stageRepository = StageRepository(appDatabase: appDatabase)
     self.stageRepository = stageRepository
     let todoRepository = TodoRepository(appDatabase: appDatabase)

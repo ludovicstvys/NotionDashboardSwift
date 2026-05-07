@@ -10,6 +10,9 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     SPARKLE_PUBLIC_ED_KEY: ""
 packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.5.0
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.9.1
@@ -18,8 +21,15 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "16.0"
+    dependencies:
+      - package: GRDB
+        product: GRDB
+      - target: NotionDashboardWidgets-iOS
+        embed: true
     sources:
       - path: Sources
+        excludes:
+          - Widgets
     info:
       path: Config/iOS-Info.plist
       properties:
@@ -27,12 +37,17 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
-          - CFBundleURLName: notiondashboard.oauth
+          - CFBundleURLName: notiondashboard.app
             CFBundleURLSchemes:
-              - com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db
+              - notiondashboard
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
+    entitlements:
+      path: Config/iOS-Info.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.loldashboard.notiondashboard.widgets
     settings:
       base:
         PRODUCT_NAME: Dashboard
@@ -43,10 +58,16 @@ targets:
     platform: macOS
     deploymentTarget: "13.0"
     dependencies:
+      - package: GRDB
+        product: GRDB
       - package: Sparkle
         product: Sparkle
+      - target: NotionDashboardWidgets-macOS
+        embed: true
     sources:
       - path: Sources
+        excludes:
+          - Widgets
     info:
       path: Config/macOS-Info.plist
       properties:
@@ -54,9 +75,9 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
-          - CFBundleURLName: notiondashboard.oauth
+          - CFBundleURLName: notiondashboard.app
             CFBundleURLSchemes:
-              - com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db
+              - notiondashboard
         LSMinimumSystemVersion: "13.0"
         UpdateChannel: dev
         SUEnableAutomaticChecks: true
@@ -66,9 +87,82 @@ targets:
         SUFeedURL: https://ludovicstvys.github.io/NotionDashboardSwift/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_ED_KEY)
         SURequireSignedFeed: true
+    entitlements:
+      path: Config/macOS-Info.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+        com.apple.security.temporary-exception.files.home-relative-path.read-write:
+          - /Library/Application Support/NotionDashboard/
+        com.apple.security.temporary-exception.files.home-relative-path.read-only:
+          - /Library/Preferences/com.loldashboard.notiondashboard.macos.plist
+        com.apple.security.application-groups:
+          - group.com.loldashboard.notiondashboard.widgets
     settings:
       base:
         PRODUCT_NAME: Dashboard
         PRODUCT_BUNDLE_IDENTIFIER: com.loldashboard.notiondashboard.macos
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 23NR88847P
+        CODE_SIGN_IDENTITY[sdk=macosx*]: Apple Development
         OTHER_LDFLAGS: $(inherited) -weak_framework AppIntents
+  NotionDashboardWidgets-iOS:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources/Widgets
+      - path: Sources/Services
+        includes:
+          - WidgetData.swift
+    info:
+      path: Config/NotionDashboardWidgets-Info.plist
+      properties:
+        CFBundleDisplayName: NotionDashboardWidgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Config/NotionDashboardWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.loldashboard.notiondashboard.widgets
+    settings:
+      base:
+        PRODUCT_NAME: NotionDashboardWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.loldashboard.notiondashboard.ios.widgets
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+  NotionDashboardWidgets-macOS:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: Sources/Widgets
+      - path: Sources/Services
+        includes:
+          - WidgetData.swift
+    info:
+      path: Config/NotionDashboardWidgets-macOS-Info.plist
+      properties:
+        CFBundleDisplayName: NotionDashboardWidgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: Config/NotionDashboardWidgets-macOS.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.temporary-exception.files.home-relative-path.read-write:
+          - /Library/Application Support/NotionDashboard/
+        com.apple.security.application-groups:
+          - group.com.loldashboard.notiondashboard.widgets
+    settings:
+      base:
+        PRODUCT_NAME: NotionDashboardWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.loldashboard.notiondashboard.macos.widgets
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 23NR88847P
+        CODE_SIGN_IDENTITY[sdk=macosx*]: Apple Development

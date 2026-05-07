@@ -1,4 +1,7 @@
 import Foundation
+#if os(macOS)
+import Darwin
+#endif
 
 struct WidgetTodoSnapshot: Codable, Hashable, Identifiable {
   var id: String
@@ -25,6 +28,30 @@ struct WidgetEventSnapshot: Codable, Hashable, Identifiable {
   var calendarName: String
   var eventTypeLabel: String
   var isAllDay: Bool
+}
+
+struct WidgetFocusSnapshot: Codable, Hashable {
+  var generatedAt: Date
+  var isEnabled: Bool
+  var isPaused: Bool
+  var phase: String
+  var summary: String
+  var remainingSeconds: Int
+  var endDate: Date?
+  var workMinutes: Int
+  var breakMinutes: Int
+
+  static let empty = WidgetFocusSnapshot(
+    generatedAt: .distantPast,
+    isEnabled: false,
+    isPaused: false,
+    phase: "idle",
+    summary: "Focus off",
+    remainingSeconds: 0,
+    endDate: nil,
+    workMinutes: 25,
+    breakMinutes: 5
+  )
 }
 
 struct DashboardWidgetSnapshot: Codable, Hashable {
@@ -70,32 +97,91 @@ enum WidgetDeepLink {
 }
 
 enum WidgetSnapshotStore {
-  static let appGroupIdentifier = "group.com.loldashboard.notiondashboard"
-  private static let fileName = "dashboard-widget-snapshot.json"
+  private static let fileName = "dashboard-widget-snapshot-v2.json"
 
   static func load() -> DashboardWidgetSnapshot? {
-    guard let url = snapshotURL() else { return nil }
-    guard let data = try? Data(contentsOf: url) else { return nil }
-    let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .iso8601
-    return try? decoder.decode(DashboardWidgetSnapshot.self, from: data)
+    loadFromFile()
   }
 
   static func save(_ snapshot: DashboardWidgetSnapshot) {
-    guard let url = snapshotURL() else { return }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    encoder.dateEncodingStrategy = .iso8601
-    guard let data = try? encoder.encode(snapshot) else { return }
-    try? data.write(to: url, options: .atomic)
+    guard let data = encode(snapshot) else { return }
+    if let url = snapshotURL() {
+      try? data.write(to: url)
+    }
   }
 
   private static func snapshotURL() -> URL? {
-    guard let containerURL = FileManager.default.containerURL(
-      forSecurityApplicationGroupIdentifier: appGroupIdentifier
-    ) else {
-      return nil
-    }
-    return containerURL.appendingPathComponent(fileName)
+    WidgetSharedContainer.url(appending: fileName)
   }
+
+  private static func loadFromFile() -> DashboardWidgetSnapshot? {
+    guard let url = snapshotURL(), let data = try? Data(contentsOf: url) else { return nil }
+    return decode(DashboardWidgetSnapshot.self, from: data)
+  }
+
+}
+
+enum FocusWidgetSnapshotStore {
+  private static let fileName = "focus-widget-snapshot-v2.json"
+
+  static func load() -> WidgetFocusSnapshot? {
+    loadFromFile()
+  }
+
+  static func save(_ snapshot: WidgetFocusSnapshot) {
+    guard let data = encode(snapshot) else { return }
+    if let url = snapshotURL() {
+      try? data.write(to: url)
+    }
+  }
+
+  private static func snapshotURL() -> URL? {
+    WidgetSharedContainer.url(appending: fileName)
+  }
+
+  private static func loadFromFile() -> WidgetFocusSnapshot? {
+    guard let url = snapshotURL(), let data = try? Data(contentsOf: url) else { return nil }
+    return decode(WidgetFocusSnapshot.self, from: data)
+  }
+
+}
+
+private enum WidgetSharedContainer {
+  private static let appGroupIdentifier = "group.com.loldashboard.notiondashboard.widgets"
+  private static let directoryName = "NotionDashboard/WidgetSnapshots"
+
+  static func url(appending fileName: String) -> URL? {
+#if os(macOS)
+    guard let homeURL = realHomeURL else { return nil }
+    let directoryURL = homeURL
+      .appendingPathComponent("Library/Application Support", isDirectory: true)
+      .appendingPathComponent(directoryName, isDirectory: true)
+#else
+    guard let directoryURL = FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?
+      .appendingPathComponent(directoryName, isDirectory: true) else { return nil }
+#endif
+    try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    return directoryURL.appendingPathComponent(fileName)
+  }
+
+#if os(macOS)
+  private static var realHomeURL: URL? {
+    guard let homePointer = getpwuid(getuid())?.pointee.pw_dir else { return nil }
+    return URL(fileURLWithPath: String(cString: homePointer), isDirectory: true)
+  }
+#endif
+}
+
+private func encode<T: Encodable>(_ value: T) -> Data? {
+  let encoder = JSONEncoder()
+  encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+  encoder.dateEncodingStrategy = .iso8601
+  return try? encoder.encode(value)
+}
+
+private func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {
+  let decoder = JSONDecoder()
+  decoder.dateDecodingStrategy = .iso8601
+  return try? decoder.decode(type, from: data)
 }

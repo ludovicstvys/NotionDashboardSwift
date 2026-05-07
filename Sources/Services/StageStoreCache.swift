@@ -15,7 +15,6 @@ struct StageStoreSnapshot: Codable {
 }
 
 enum StageStoreCache {
-  private static let folderName = "NotionDashboard"
   private static let fileName = "stage-store-cache-v2.json"
 
   static func load() -> StageStoreSnapshot? {
@@ -44,11 +43,6 @@ enum StageStoreCache {
   }
 
   private static func snapshotURL() -> URL? {
-    guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-      return nil
-    }
-    return base
-      .appendingPathComponent(folderName, isDirectory: true)
-      .appendingPathComponent(fileName, isDirectory: false)
+    AppSupportDirectory.fileURL(fileName)
   }
 }

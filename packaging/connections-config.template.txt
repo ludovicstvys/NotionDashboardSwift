@@ -5,8 +5,9 @@
     "focusModeEnabled": false,
     "googleAccessToken": "",
     "googleDefaultCalendarID": "",
-    "googleOAuthClientID": "608348086080-dp8647muci5st4em00pdgvrba75jq3db.apps.googleusercontent.com",
-    "googleOAuthRedirectURI": "com.googleusercontent.apps.608348086080-dp8647muci5st4em00pdgvrba75jq3db:/oauth2redirect",
+    "googleOAuthClientID": "",
+    "googleOAuthClientSecret": "",
+    "googleOAuthRedirectURI": "",
     "googleOAuthScopes": [
       "https://www.googleapis.com/auth/calendar.readonly",
       "https://www.googleapis.com/auth/calendar.events"

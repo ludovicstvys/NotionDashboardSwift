@@ -7,9 +7,6 @@ private struct SettingsTextDrafts: Equatable {
   var notionTodoDbId: String = ""
   var bdfApiKey: String = ""
   var googlePlacesApiKey: String = ""
-  var googleOAuthClientID: String = ""
-  var googleOAuthRedirectURI: String = ""
-  var googleOAuthScopes: String = ""
   var externalIcalUrl: String = ""
   var defaultReminders: String = ""
   var meetingReminders: String = ""
@@ -35,9 +32,6 @@ private struct SettingsTextDrafts: Equatable {
       notionTodoDbId: config.notionTodoDbId,
       bdfApiKey: config.bdfApiKey,
       googlePlacesApiKey: config.googlePlacesApiKey,
-      googleOAuthClientID: config.googleOAuthClientID,
-      googleOAuthRedirectURI: config.googleOAuthRedirectURI,
-      googleOAuthScopes: config.googleOAuthScopes.joined(separator: ","),
       externalIcalUrl: config.externalIcalUrl,
       defaultReminders: config.reminderPrefs.defaultMinutes.map(String.init).joined(separator: ","),
       meetingReminders: config.reminderPrefs.meetingMinutes.map(String.init).joined(separator: ","),
@@ -68,6 +62,7 @@ struct SettingsView: View {
   @EnvironmentObject private var notificationScheduler: NotificationScheduler
   @EnvironmentObject private var marketNewsStore: MarketNewsStore
   @EnvironmentObject private var diagnosticsStore: DiagnosticsStore
+  @EnvironmentObject private var focusStore: FocusStore
 
   @State private var exportDocument = ConnectionsTextDocument()
   @State private var showExporter = false
@@ -77,6 +72,10 @@ struct SettingsView: View {
   @State private var urlRuleInput: String = ""
   @State private var textDrafts = SettingsTextDrafts()
   @State private var draftCommitTask: Task<Void, Never>?
+  @State private var showCoreSettings = true
+  @State private var showCalendarSettings = true
+  @State private var showProductivitySettings = true
+  @State private var showAdvancedSettings = false
 
   var body: some View {
     NavigationStack {
@@ -85,29 +84,37 @@ struct SettingsView: View {
         ScrollView {
           LazyVStack(alignment: .leading, spacing: metrics.sectionSpacing) {
             heroPanel(metrics: metrics)
-            controlBar
+            setupHealthPanel
 
-            settingsRow(sizeClass: metrics.sizeClass) {
-              updatesPanel
-            } right: {
-              notionPanel
+            settingsSection("Core setup", isExpanded: $showCoreSettings) {
+              settingsRow(sizeClass: metrics.sizeClass) {
+                updatesPanel
+              } right: {
+                notionPanel
+              }
             }
 
-            settingsRow(sizeClass: metrics.sizeClass) {
-              googlePanel
-            } right: {
-              calendarPanel
+            settingsSection("Calendar and alerts", isExpanded: $showCalendarSettings) {
+              settingsRow(sizeClass: metrics.sizeClass) {
+                GoogleCalendarSettingsPanel()
+              } right: {
+                calendarPanel
+              }
             }
 
-            settingsRow(sizeClass: metrics.sizeClass) {
-              focusPanel
-            } right: {
-              marketPanel
+            settingsSection("Productivity signals", isExpanded: $showProductivitySettings) {
+              settingsRow(sizeClass: metrics.sizeClass) {
+                focusPanel
+              } right: {
+                marketPanel
+              }
             }
 
-            mappingPanel
-            importExportPanel
-            diagnosticsPanel
+            settingsSection("Advanced", isExpanded: $showAdvancedSettings) {
+              mappingPanel
+              importExportPanel
+              diagnosticsPanel
+            }
           }
           .padding(.horizontal, metrics.horizontalPadding)
           .padding(.vertical, metrics.regularPanelPadding)
@@ -163,36 +170,8 @@ struct SettingsView: View {
     .instrumentedScreen("SettingsView")
   }
 
-  private var controlBar: some View {
-    WorkspaceCommandBar(
-      title: "Settings",
-      subtitle: "Keep sync, exports, and system actions close without overloading the page."
-    ) {
-#if os(macOS)
-      Button("Check updates") {
-        Task { await updateStore.checkForUpdates(userInitiated: true) }
-      }
-      .buttonStyle(.borderedProminent)
-      .tint(WorkspacePalette.accent)
-#endif
-
-      Button("Sync Notion") {
-        commitTextDrafts()
-        Task { await stageStore.syncFromNotion() }
-      }
-      .buttonStyle(.bordered)
-
-      Button("Export") {
-        prepareConnectionsExport()
-      }
-      .buttonStyle(.bordered)
-
-      WorkspaceBadge(text: "\(activeFeedCount) feeds", tint: WorkspacePalette.accentSoft)
-    }
-  }
-
   private func heroPanel(metrics: WorkspaceLayoutMetrics) -> some View {
-    WorkspacePanel(tint: WorkspacePalette.warning, padding: metrics.regularPanelPadding) {
+    WorkspaceHeroPanel(tint: WorkspacePalette.warning, padding: metrics.regularPanelPadding) {
       VStack(alignment: .leading, spacing: 22) {
         HStack(alignment: .top, spacing: 20) {
           VStack(alignment: .leading, spacing: 12) {
@@ -201,12 +180,12 @@ struct SettingsView: View {
               .tracking(1.8)
               .foregroundStyle(Color.white.opacity(0.70))
 
-            Text("Tune connections,\nautomation, and sync.")
+            Text("Control center.\nNo hidden setup.")
               .font(.system(size: metrics.sizeClass == .wide ? 42 : 34, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
               .fixedSize(horizontal: false, vertical: true)
 
-            Text("Settings is now organized like the rest of the app: quick system state first, then grouped control panels for credentials, reminders, and diagnostics.")
+            Text("Manage credentials, sync, reminders, exports and diagnostics from predictable grouped controls.")
               .font(.subheadline)
               .foregroundStyle(Color.white.opacity(0.72))
               .fixedSize(horizontal: false, vertical: true)
@@ -303,6 +282,59 @@ struct SettingsView: View {
     }
   }
 
+  private var setupHealthPanel: some View {
+    WorkspacePanel(
+      title: "Setup health",
+      subtitle: "The minimum viable dashboard setup in one readable checklist.",
+      tint: setupHealthTint
+    ) {
+      VStack(alignment: .leading, spacing: 18) {
+        HStack(spacing: 10) {
+          WorkspaceBadge(text: setupHealthTitle, tint: setupHealthTint)
+          WorkspaceBadge(text: "\(activeFeedCount) active feed(s)", tint: WorkspacePalette.accentSoft)
+        }
+
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
+          settingsMetric(
+            title: "Notion",
+            value: configStore.config.hasNotionCredentials ? "Ready" : "Missing",
+            detail: "pipeline source",
+            tint: configStore.config.hasNotionCredentials ? WorkspacePalette.success : WorkspacePalette.warning
+          )
+          settingsMetric(
+            title: "Calendar",
+            value: calendarReady ? "Ready" : "Missing",
+            detail: calendarStore.sourceSummary,
+            tint: calendarReady ? WorkspacePalette.success : WorkspacePalette.warning
+          )
+          settingsMetric(
+            title: "Alerts",
+            value: notificationMetricValue,
+            detail: notificationMetricDetail,
+            tint: notificationsReady ? WorkspacePalette.success : WorkspacePalette.warning
+          )
+          settingsMetric(
+            title: "Focus",
+            value: focusStore.isEnabled ? "Running" : (configStore.config.focusModeEnabled ? "On" : "Off"),
+            detail: focusStore.focusSummary,
+            tint: .pink
+          )
+        }
+
+        if setupIssues.isEmpty {
+          panelMessage("Everything required for the dashboard is configured.")
+        } else {
+          VStack(alignment: .leading, spacing: 8) {
+            panelLabel("Needs attention")
+            ForEach(setupIssues, id: \.self) { issue in
+              panelMessage(issue)
+            }
+          }
+        }
+      }
+    }
+  }
+
   private var notionPanel: some View {
     WorkspacePanel(
       title: "Notion and pipeline",
@@ -354,90 +386,6 @@ struct SettingsView: View {
     }
   }
 
-  private var googlePanel: some View {
-    WorkspacePanel(
-      title: "Google OAuth",
-      subtitle: "Calendar auth, scope configuration, and default routing stay in a single auth surface.",
-      tint: WorkspacePalette.accent
-    ) {
-      VStack(alignment: .leading, spacing: 18) {
-        settingsTextField(
-          "Client ID",
-          text: textDraftBinding(\.googleOAuthClientID),
-          prompt: "OAuth client ID",
-          monospaced: true
-        )
-        settingsTextField("Redirect URI", text: textDraftBinding(\.googleOAuthRedirectURI), prompt: "Custom redirect URI", monospaced: true)
-        panelHint(recommendedRedirectURIHint)
-        settingsTextField(
-          "Scopes",
-          text: textDraftBinding(\.googleOAuthScopes),
-          prompt: "Comma-separated OAuth scopes",
-          monospaced: true
-        )
-
-        HStack(spacing: 10) {
-          Button(googleAuthStore.isAuthenticated ? "Reconnect Google" : "Connect Google") {
-            commitTextDrafts()
-            Task { await googleAuthStore.signInInteractive() }
-          }
-          .buttonStyle(.borderedProminent)
-          .tint(WorkspacePalette.accent)
-
-          Button("Disconnect") {
-            googleAuthStore.signOut()
-            Task { await calendarStore.handleGoogleSignOut(icalURL: configStore.config.externalIcalUrl) }
-          }
-          .buttonStyle(.bordered)
-          .disabled(!googleAuthStore.isAuthenticated)
-
-          Button("Load calendars") {
-            commitTextDrafts()
-            Task { await calendarStore.loadGoogleCalendars(force: true) }
-          }
-          .buttonStyle(.bordered)
-        }
-
-        if !calendarStore.googleCalendars.isEmpty {
-          VStack(alignment: .leading, spacing: 6) {
-            panelLabel("Default calendar")
-            Menu {
-              Button("Primary") {
-                binding(for: \.googleDefaultCalendarID).wrappedValue = ""
-              }
-              ForEach(calendarStore.googleCalendars) { cal in
-                Button(cal.name) {
-                  binding(for: \.googleDefaultCalendarID).wrappedValue = cal.id
-                }
-              }
-            } label: {
-              HStack(spacing: 10) {
-                Text(defaultCalendarLabel)
-                Image(systemName: "chevron.down")
-                  .font(.caption.weight(.semibold))
-              }
-              .font(.caption.weight(.semibold))
-              .foregroundStyle(.white)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 10)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .background(WorkspacePalette.innerCard)
-              .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                  .stroke(Color.white.opacity(0.10), lineWidth: 1)
-              )
-              .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-          }
-        }
-
-        if !googleAuthStore.statusMessage.isEmpty {
-          panelMessage(googleAuthStore.statusMessage)
-        }
-      }
-    }
-  }
-
   private var calendarPanel: some View {
     WorkspacePanel(
       title: "Calendar and reminders",
@@ -445,7 +393,7 @@ struct SettingsView: View {
       tint: WorkspacePalette.warning
     ) {
       VStack(alignment: .leading, spacing: 18) {
-        settingsTextField("External iCal URL", text: textDraftBinding(\.externalIcalUrl), prompt: "https://.../agenda/ical/...", monospaced: true)
+        settingsTextField("External iCal feed", text: textDraftBinding(\.externalIcalUrl), prompt: "Paste calendar feed", monospaced: true)
         panelHint("The Calendar screen uses this feed when loading external events.")
 
         HStack(spacing: 10) {
@@ -462,6 +410,13 @@ struct SettingsView: View {
                 events: calendarStore.events,
                 prefs: configStore.config.reminderPrefs
               )
+            }
+          }
+          .buttonStyle(.bordered)
+
+          Button("Schedule daily summary") {
+            Task {
+              await notificationScheduler.scheduleDailySummary(events: calendarStore.events)
             }
           }
           .buttonStyle(.bordered)
@@ -620,11 +575,20 @@ struct SettingsView: View {
       tint: .white
     ) {
       VStack(alignment: .leading, spacing: 18) {
-        HStack {
-          Text("Queue offline: \(stageStore.pendingQueueCount)")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-          Spacer()
+        HStack(alignment: .top, spacing: 12) {
+          WorkspaceMetricTile(
+            title: "Queue",
+            value: "\(stageStore.pendingQueueCount)",
+            detail: stageStore.pendingQueueCount == 0 ? "no pending ops" : "awaiting retry",
+            tint: WorkspacePalette.warning
+          )
+          WorkspaceMetricTile(
+            title: "Last sync",
+            value: stageStore.lastSuccessfulNotionSyncDate?.shortDateTime ?? "Never",
+            detail: stageStore.lastSuccessfulNotionSyncDate == nil ? "not synced yet" : "last successful Notion sync",
+            tint: WorkspacePalette.success
+          )
+          Spacer(minLength: 0)
           Button("Clear logs") { diagnosticsStore.clear() }
             .buttonStyle(.bordered)
         }
@@ -632,15 +596,29 @@ struct SettingsView: View {
         if stageStore.pendingQueueCount > 0 {
           VStack(alignment: .leading, spacing: 8) {
             panelLabel("Pending operations")
+            HStack(spacing: 8) {
+              panelBadge("Upserts: \(pendingOperationCount(kind: .upsertStage))", tint: WorkspacePalette.accent)
+              panelBadge("Status: \(pendingOperationCount(kind: .updateStatus))", tint: WorkspacePalette.warning)
+            }
             ForEach(stageStore.pendingOperations.prefix(20)) { op in
-              HStack {
-                Text(op.kind.rawValue)
-                  .font(.caption.weight(.semibold))
-                  .foregroundStyle(.white)
-                Spacer()
-                Text("retry: \(op.retryCount)")
-                  .font(.caption2)
-                  .foregroundStyle(Color.white.opacity(0.62))
+              VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                  Text(op.kind.rawValue)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                  Spacer()
+                  Text("retry: \(op.retryCount)")
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.62))
+                }
+                Text(pendingOperationTitle(op))
+                  .font(.caption)
+                  .foregroundStyle(Color.white.opacity(0.78))
+                if !pendingOperationSubtitle(op).isEmpty {
+                  Text(pendingOperationSubtitle(op))
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.58))
+                }
               }
               .padding(.horizontal, 12)
               .padding(.vertical, 10)
@@ -701,6 +679,31 @@ struct SettingsView: View {
         right()
       }
     }
+  }
+
+  private func settingsSection<Content: View>(
+    _ title: String,
+    isExpanded: Binding<Bool>,
+    @ViewBuilder content: @escaping () -> Content
+  ) -> some View {
+    DisclosureGroup(isExpanded: isExpanded) {
+      VStack(alignment: .leading, spacing: 20) {
+        content()
+      }
+      .padding(.top, 16)
+    } label: {
+      HStack {
+        Text(title)
+          .font(.headline.weight(.semibold))
+          .foregroundStyle(.white)
+        Spacer()
+        Text(isExpanded.wrappedValue ? "Hide" : "Show")
+          .font(.caption.weight(.bold))
+          .foregroundStyle(Color.white.opacity(0.62))
+      }
+    }
+    .padding(18)
+    .workspaceInteractiveSurface(cornerRadius: 24, tint: WorkspacePalette.accent, raised: false)
   }
 
   private func settingsTextField(
@@ -790,12 +793,47 @@ struct SettingsView: View {
     return count
   }
 
-  private var recommendedRedirectURIHint: String {
-    let recommended = AppConfig.recommendedGoogleOAuthRedirectURI(for: normalizedDraftValue(textDrafts.googleOAuthClientID))
-    if recommended.isEmpty {
-      return "Enter a valid Google OAuth client ID to derive the recommended callback."
+  private var calendarReady: Bool {
+    googleAuthStore.isAuthenticated || !configStore.config.externalIcalUrl.isEmpty
+  }
+
+  private var notificationsReady: Bool {
+    switch notificationScheduler.authorizationStatus {
+    case .authorized, .provisional:
+      return true
+    case .denied, .notDetermined, .ephemeral:
+      return false
+    @unknown default:
+      return false
     }
-    return "Recommended for this client ID: \(recommended)"
+  }
+
+  private var setupHealthTitle: String {
+    setupIssues.isEmpty ? "Healthy" : "\(setupIssues.count) issue(s)"
+  }
+
+  private var setupHealthTint: Color {
+    setupIssues.isEmpty ? WorkspacePalette.success : WorkspacePalette.warning
+  }
+
+  private var setupIssues: [String] {
+    var issues: [String] = []
+    if !configStore.config.hasNotionCredentials {
+      issues.append("Add a Notion token and database ID to enable pipeline sync.")
+    }
+    if !calendarReady {
+      issues.append("Connect Google Calendar or add an external iCal URL.")
+    }
+    if notificationScheduler.authorizationStatus == .notDetermined {
+      issues.append("Request notification permission to enable reminders.")
+    }
+    if notificationScheduler.authorizationStatus == .denied {
+      issues.append("Notifications are blocked in system settings.")
+    }
+    if configStore.config.marketsEnabled && configStore.config.marketSymbols.isEmpty {
+      issues.append("Add at least one market symbol or disable market signals.")
+    }
+    return issues
   }
 
   private var footerMessage: String {
@@ -847,7 +885,42 @@ struct SettingsView: View {
           config[keyPath: keyPath] = newValue
         }
       }
-    )
+      )
+  }
+
+  private func panelBadge(_ text: String, tint: Color) -> some View {
+    Text(text)
+      .font(.caption2.weight(.semibold))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .background(tint.opacity(0.16))
+      .foregroundStyle(tint)
+      .clipShape(Capsule())
+  }
+
+  private func pendingOperationCount(kind: PendingNotionOperation.Kind) -> Int {
+    stageStore.pendingOperations.filter { $0.kind == kind }.count
+  }
+
+  private func pendingOperationTitle(_ op: PendingNotionOperation) -> String {
+    switch op.kind {
+    case .upsertStage:
+      if let stage = op.stage {
+        return stage.displayLabel.isEmpty ? "Stage" : stage.displayLabel
+      }
+      return op.stageID ?? "Stage"
+    case .updateStatus:
+      return op.stageID ?? "Stage status"
+    }
+  }
+
+  private func pendingOperationSubtitle(_ op: PendingNotionOperation) -> String {
+    switch op.kind {
+    case .upsertStage:
+      return op.stage?.status.rawValue ?? "Waiting for Notion upsert"
+    case .updateStatus:
+      return op.status?.rawValue ?? "Waiting for Notion status update"
+    }
   }
 
   private var defaultCalendarLabel: String {
@@ -888,17 +961,6 @@ struct SettingsView: View {
     draftCommitTask = nil
 
     let currentConfig = configStore.config
-    let nextClientID = normalizedDraftValue(textDrafts.googleOAuthClientID)
-    let nextRedirectDraft = normalizedDraftValue(textDrafts.googleOAuthRedirectURI)
-    let nextRedirectURI: String
-
-    if AppConfig.usesManagedGoogleOAuthRedirectURI(nextRedirectDraft, clientID: currentConfig.googleOAuthClientID) {
-      nextRedirectURI = AppConfig.recommendedGoogleOAuthRedirectURI(for: nextClientID)
-    } else {
-      nextRedirectURI = nextRedirectDraft
-    }
-
-    let nextScopes = parseCSV(textDrafts.googleOAuthScopes)
     let nextSymbols = parseCSV(textDrafts.marketSymbols)
     var nextConfig = currentConfig
     nextConfig.notionToken = normalizedDraftValue(textDrafts.notionToken)
@@ -906,9 +968,6 @@ struct SettingsView: View {
     nextConfig.notionTodoDbId = normalizedDraftValue(textDrafts.notionTodoDbId)
     nextConfig.bdfApiKey = normalizedDraftValue(textDrafts.bdfApiKey)
     nextConfig.googlePlacesApiKey = normalizedDraftValue(textDrafts.googlePlacesApiKey)
-    nextConfig.googleOAuthClientID = nextClientID
-    nextConfig.googleOAuthRedirectURI = nextRedirectURI
-    nextConfig.googleOAuthScopes = nextScopes.isEmpty ? AppConfig.defaults.googleOAuthScopes : nextScopes
     nextConfig.externalIcalUrl = normalizedDraftValue(textDrafts.externalIcalUrl)
     nextConfig.reminderPrefs = ReminderPrefs(
       defaultMinutes: parseReminderList(textDrafts.defaultReminders, fallback: ReminderPrefs.defaults.defaultMinutes),
@@ -1054,6 +1113,10 @@ private struct SettingsFocusPanel: View {
           .buttonStyle(.bordered)
         }
 
+        Text("Rules match every path on a blocked host, for example instagram.com also blocks instagram.com/direct/inbox. This protects links opened from Dashboard and notifications; it does not intercept URLs typed directly in a browser.")
+          .font(.caption)
+          .foregroundStyle(Color.white.opacity(0.62))
+
         if configStore.config.urlBlockerRules.isEmpty {
           Text("No blocked host configured.")
             .font(.caption)
@@ -1109,6 +1172,194 @@ private struct SettingsFocusPanel: View {
       configStore.update { $0.urlBlockerRules.append(clean) }
     }
     urlRuleInput = ""
+  }
+}
+
+struct GoogleCalendarSettingsPanel: View {
+  @EnvironmentObject private var configStore: ConfigStore
+  @EnvironmentObject private var googleAuthStore: GoogleAuthStore
+  @EnvironmentObject private var calendarStore: CalendarStore
+
+  var body: some View {
+    WorkspacePanel(
+      title: "Google Calendar",
+      subtitle: "Connect once, then choose calendars and sync behavior from a single surface.",
+      tint: WorkspacePalette.accent
+    ) {
+      VStack(alignment: .leading, spacing: 18) {
+        actionBar
+        summaryRow
+        calendarList
+        statusSection
+      }
+    }
+  }
+
+  private var actionBar: some View {
+    HStack(spacing: 10) {
+      Button(googleAuthStore.isAuthenticated ? "Reconnect" : "Connect Google") {
+        Task {
+          let connected = await googleAuthStore.signInInteractive()
+          if connected {
+            await calendarStore.loadGoogleCalendars(force: true)
+            await calendarStore.loadCombinedEvents(icalURL: configStore.config.externalIcalUrl)
+          }
+        }
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(WorkspacePalette.accent)
+
+      Button("Disconnect") {
+        googleAuthStore.signOut()
+        Task { await calendarStore.handleGoogleSignOut(icalURL: configStore.config.externalIcalUrl) }
+      }
+      .buttonStyle(.bordered)
+      .disabled(!googleAuthStore.isAuthenticated)
+
+      Button("Refresh calendars") {
+        Task {
+          await calendarStore.loadGoogleCalendars(force: true)
+          await calendarStore.loadCombinedEvents(icalURL: configStore.config.externalIcalUrl)
+        }
+      }
+      .buttonStyle(.bordered)
+
+      Button("Primary only") {
+        selectPrimaryCalendar()
+      }
+      .buttonStyle(.bordered)
+      .disabled(calendarStore.googleCalendars.isEmpty)
+    }
+  }
+
+  private var summaryRow: some View {
+    HStack(spacing: 10) {
+      WorkspaceBadge(
+        text: googleAuthStore.connectionSummary,
+        tint: googleAuthStore.isAuthenticated ? WorkspacePalette.success : WorkspacePalette.warning
+      )
+      WorkspaceBadge(
+        text: calendarStore.googleSyncSummary,
+        tint: WorkspacePalette.accentSoft
+      )
+    }
+  }
+
+  private var calendarList: some View {
+    Group {
+      if calendarStore.googleCalendars.isEmpty {
+        panelHint(googleAuthStore.isAuthenticated ? "No calendars loaded yet. Refresh to fetch your Google calendars." : "Connect Google to load calendars.")
+      } else {
+        VStack(alignment: .leading, spacing: 8) {
+          panelLabel("Calendars")
+          ForEach(calendarStore.googleCalendars) { cal in
+            Toggle(isOn: Binding(
+              get: { calendarStore.selectedCalendarIDs.contains(cal.id) },
+              set: { isSelected in
+                Task {
+                  await calendarStore.setCalendarSelected(
+                    calendarID: cal.id,
+                    isSelected: isSelected,
+                    icalURL: configStore.config.externalIcalUrl
+                  )
+                }
+              }
+            )) {
+              HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                  HStack(spacing: 8) {
+                    ColorDot(color: cal.backgroundColor)
+                      .frame(width: 10, height: 10)
+                    Text(cal.name)
+                    if cal.isPrimary {
+                      Text("Primary")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(WorkspacePalette.innerCard)
+                        .clipShape(Capsule())
+                    }
+                  }
+                  .font(.subheadline.weight(.semibold))
+                  .foregroundStyle(.white)
+                  Text("\(cal.id) • \(calendarStore.eventCount(for: cal.id)) events")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(Color.white.opacity(0.58))
+                }
+                Spacer()
+              }
+            }
+            .toggleStyle(.switch)
+          }
+        }
+      }
+    }
+  }
+
+  private var statusSection: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      panelMessage(googleAuthStore.statusMessage)
+      if !calendarStore.statusMessage.isEmpty {
+        panelMessage(calendarStore.statusMessage)
+      }
+    }
+  }
+
+  private func selectPrimaryCalendar() {
+    let primary = calendarStore.googleCalendars.first(where: \.isPrimary)?.id
+    configStore.update { config in
+      config.googleSelectedCalendarIDs = primary.map { [$0] } ?? []
+      config.googleDefaultCalendarID = primary ?? ""
+    }
+    calendarStore.selectedCalendarIDs = primary.map { Set([$0]) } ?? []
+  }
+
+  private func settingsTextField(
+    _ title: String,
+    text: Binding<String>,
+    prompt: String,
+    monospaced: Bool = false
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      panelLabel(title)
+      TextField(prompt, text: text)
+        .textFieldStyle(.roundedBorder)
+        .plainTextInputBehavior()
+        .font(monospaced ? .system(.subheadline, design: .monospaced) : .subheadline)
+    }
+  }
+
+  private func panelLabel(_ text: String) -> some View {
+    Text(text)
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(Color.white.opacity(0.68))
+  }
+
+  private func panelHint(_ text: String) -> some View {
+    Text(text)
+      .font(.caption)
+      .foregroundStyle(Color.white.opacity(0.60))
+      .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private func panelMessage(_ text: String) -> some View {
+    Text(text)
+      .font(.caption)
+      .foregroundStyle(Color.white.opacity(0.80))
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .workspaceInteractiveSurface(cornerRadius: 16, tint: .white, raised: false)
+  }
+}
+
+private struct ColorDot: View {
+  let color: String?
+
+  var body: some View {
+    Circle()
+      .fill(WorkspaceColor.hex(color) ?? WorkspacePalette.accent)
   }
 }
 

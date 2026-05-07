@@ -69,6 +69,7 @@ final class TodoRepository: @unchecked Sendable {
   func fetchVisibleTodos(limit: Int, focusedTodoID: String?) -> [TodoItem] {
     let base = (try? appDatabase.dbQueue.read { db in
       try TodoRecord
+        .filter(Column("status") != TodoStatus.done.rawValue)
         .order(Column("dueDate").asc)
         .limit(limit)
         .fetchAll(db)
@@ -79,7 +80,11 @@ final class TodoRepository: @unchecked Sendable {
     guard !base.contains(where: { $0.id == focusedTodoID }) else { return base }
 
     let focused = try? appDatabase.dbQueue.read { db in
-      try TodoRecord.fetchOne(db, key: focusedTodoID)?.makeTodo()
+      try TodoRecord
+        .filter(key: focusedTodoID)
+        .filter(Column("status") != TodoStatus.done.rawValue)
+        .fetchOne(db)?
+        .makeTodo()
     }
     guard let focused else { return base }
     return base + [focused]

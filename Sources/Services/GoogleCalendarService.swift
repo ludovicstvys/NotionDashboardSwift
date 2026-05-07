@@ -24,7 +24,15 @@ struct GoogleCalendarService {
       guard let id = item["id"] as? String else { return nil }
       let name = (item["summary"] as? String) ?? id
       let primary = (item["primary"] as? Bool) ?? false
-      return GoogleCalendarDescriptor(id: id, name: name, isPrimary: primary)
+      let backgroundColor = item["backgroundColor"] as? String
+      let foregroundColor = item["foregroundColor"] as? String
+      return GoogleCalendarDescriptor(
+        id: id,
+        name: name,
+        isPrimary: primary,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor
+      )
     }
   }
 
@@ -100,6 +108,43 @@ struct GoogleCalendarService {
     return id
   }
 
+  func updateEvent(
+    accessToken: String,
+    calendarID: String,
+    eventID: String,
+    summary: String,
+    location: String,
+    description: String,
+    start: Date,
+    end: Date
+  ) async throws {
+    guard let url = URL(string: "\(baseURL)/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)") else {
+      throw GoogleCalendarError.invalidResponse
+    }
+    var req = URLRequest(url: url)
+    req.httpMethod = "PATCH"
+    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    req.addValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = try JSONSerialization.data(withJSONObject: eventPayload(
+      summary: summary,
+      location: location,
+      description: description,
+      start: start,
+      end: end
+    ), options: [])
+    try await sendMutation(req)
+  }
+
+  func deleteEvent(accessToken: String, calendarID: String, eventID: String) async throws {
+    guard let url = URL(string: "\(baseURL)/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)") else {
+      throw GoogleCalendarError.invalidResponse
+    }
+    var req = URLRequest(url: url)
+    req.httpMethod = "DELETE"
+    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+    try await sendMutation(req, acceptsEmptyResponse: true)
+  }
+
   private func request(
     path: String,
     queryItems: [URLQueryItem] = [],
@@ -128,6 +173,36 @@ struct GoogleCalendarService {
       throw GoogleCalendarError.invalidResponse
     }
     return object
+  }
+
+  private func eventPayload(
+    summary: String,
+    location: String,
+    description: String,
+    start: Date,
+    end: Date
+  ) -> [String: Any] {
+    [
+      "summary": summary,
+      "location": location,
+      "description": description,
+      "start": ["dateTime": start.iso8601String],
+      "end": ["dateTime": end.iso8601String],
+    ]
+  }
+
+  private func sendMutation(_ req: URLRequest, acceptsEmptyResponse: Bool = false) async throws {
+    let (data, response) = try await URLSession.shared.data(for: req)
+    guard let http = response as? HTTPURLResponse else {
+      throw GoogleCalendarError.invalidResponse
+    }
+    if !(200...299).contains(http.statusCode) {
+      let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+      throw GoogleCalendarError.requestFailed(message)
+    }
+    if !acceptsEmptyResponse, data.isEmpty {
+      throw GoogleCalendarError.invalidResponse
+    }
   }
 
   private func parseEvent(item: [String: Any], calendarNameFallback: String) -> CalendarEvent? {

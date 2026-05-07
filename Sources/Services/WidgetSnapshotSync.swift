@@ -30,6 +30,18 @@ enum WidgetSnapshotSync {
     )
   }
 
+  static func syncEventsImmediately(_ events: [CalendarEvent]) {
+    syncNow(
+      stages: nil,
+      todos: nil,
+      events: events.widgetSnapshots()
+    )
+  }
+
+  static func reloadWidgetTimelines() {
+    reloadAllTimelines()
+  }
+
   private static func reloadAllTimelines() {
 #if canImport(WidgetKit)
     let now = Date()
@@ -48,31 +60,39 @@ enum WidgetSnapshotSync {
   ) {
     pendingWorkItem?.cancel()
     let workItem = DispatchWorkItem {
-      let start = CFAbsoluteTimeGetCurrent()
-      var snapshot = WidgetSnapshotStore.load() ?? .empty
-      if let stages {
-        snapshot.stages = stages
-      }
-      if let todos {
-        snapshot.todos = todos
-      }
-      if let events {
-        snapshot.events = events
-      }
-      let digest = snapshotDigest(snapshot)
-      if digest == lastSnapshotDigest {
-        return
-      }
-      snapshot.generatedAt = Date()
-      WidgetSnapshotStore.save(snapshot)
-      lastSnapshotDigest = digest
-      let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
-      PerformanceMonitor.recordPersistence(label: "WidgetSnapshotSync.save", durationMs: durationMs)
-      PerformanceMonitor.noteWidgetReloadScheduled()
-      reloadAllTimelines()
+      syncNow(stages: stages, todos: todos, events: events)
     }
     pendingWorkItem = workItem
     queue.asyncAfter(deadline: .now() + coalesceDelay, execute: workItem)
+  }
+
+  private static func syncNow(
+    stages: [WidgetStageSnapshot]?,
+    todos: [WidgetTodoSnapshot]?,
+    events: [WidgetEventSnapshot]?
+  ) {
+    let start = CFAbsoluteTimeGetCurrent()
+    var snapshot = WidgetSnapshotStore.load() ?? .empty
+    if let stages {
+      snapshot.stages = stages
+    }
+    if let todos {
+      snapshot.todos = todos
+    }
+    if let events {
+      snapshot.events = events
+    }
+    let digest = snapshotDigest(snapshot)
+    if digest == lastSnapshotDigest {
+      return
+    }
+    snapshot.generatedAt = Date()
+    WidgetSnapshotStore.save(snapshot)
+    lastSnapshotDigest = digest
+    let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
+    PerformanceMonitor.recordPersistence(label: "WidgetSnapshotSync.save", durationMs: durationMs)
+    PerformanceMonitor.noteWidgetReloadScheduled()
+    reloadAllTimelines()
   }
 
   private static func snapshotDigest(_ snapshot: DashboardWidgetSnapshot) -> Int {

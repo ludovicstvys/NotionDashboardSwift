@@ -255,9 +255,6 @@ final class AppDatabase: @unchecked Sendable {
   }
 
   private static var databaseURL: URL {
-    let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-    let folderURL = baseURL.appendingPathComponent("NotionDashboard", isDirectory: true)
-    try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-    return folderURL.appendingPathComponent("dashboard.sqlite")
+    AppSupportDirectory.fileURL("dashboard.sqlite")
   }
 }

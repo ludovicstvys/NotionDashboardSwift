@@ -9,65 +9,72 @@
 /* Begin PBXBuildFile section */
 		01C2CBCB1C7C100EF4E7EE13 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B093008064DA3E21522253 /* NotificationScheduler.swift */; };
 		02106A8C760D05756CC2E965 /* StageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438289F7A35B4CF5A073E423 /* StageCardView.swift */; };
+		02309D3F9C7A4D5C23BB2798 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */; };
 		04E79FD830236148CAEB2C91 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887A40B4B58FFD513719E657 /* RootView.swift */; };
 		05AB055C3FAA1B46C9805E10 /* WorkspaceChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3239F0AD2A525011A89B9A9 /* WorkspaceChrome.swift */; };
-		A10000000000000000000072 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GRDB */; };
-		A10000000000000000000073 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GRDB */; };
-		A10000000000000000000055 /* AppDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000050 /* AppDatabase.swift */; };
-		A10000000000000000000056 /* StageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000051 /* StageRepository.swift */; };
-		A10000000000000000000057 /* TodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000052 /* TodoRepository.swift */; };
-		A10000000000000000000058 /* CalendarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* CalendarRepository.swift */; };
-		A10000000000000000000059 /* ScreenViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000054 /* ScreenViewModels.swift */; };
-		A10000000000000000000027 /* ProtectedLinkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* ProtectedLinkButton.swift */; };
 		0CC918A4C416F2B779866F7C /* PipelineImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4511B6A4104663D97F71B4 /* PipelineImportService.swift */; };
+		104F2F5C65788A6247BD15EC /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */; };
 		13203043B8D1EBBA3CF65CEA /* ICSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BB2F401B4B8476FE87163A /* ICSService.swift */; };
+		133C77AE0FA79BC0B72F49F3 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */; };
 		1BA5DD8E6ECE5EBDD800A9E0 /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E01CCAEC84A7B6B8382510D8 /* GoogleCalendarService.swift */; };
+		1D81E0B1E00F9E25157EF26A /* ProtectedLinkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977815719EB7CFA795B63BC6 /* ProtectedLinkButton.swift */; };
 		245620D9C6C13DA4FE47A30A /* StageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA18B39F41FF245D0332DE35 /* StageStore.swift */; };
+		269693A4D6AF42008E188170 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5134E24BA5C8DB950354423C /* Assets.xcassets */; };
+		286AA049199F3DEEBA941F53 /* ScreenViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA1B6F082906CC551643E4E /* ScreenViewModels.swift */; };
 		2D530B2B3380CD4AE50AA427 /* ConnectionsTextDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C09A021CC2E4C72DD9B91B0 /* ConnectionsTextDocument.swift */; };
 		3388D8C4ACFC350EEC5325FE /* StageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA18B39F41FF245D0332DE35 /* StageStore.swift */; };
+		34260D1F17D3CAAC8433720C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5134E24BA5C8DB950354423C /* Assets.xcassets */; };
+		378C1E1EF76B89B9BBDA8529 /* AppSupportDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F773E96ADEDF547E0979D82 /* AppSupportDirectory.swift */; };
+		3CC7152EA09CBA742D2D2393 /* StageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A96C9BBA43BFEB64C6820E /* StageRepository.swift */; };
 		3E01E11126BD9AFFF5076448 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DC7A9E4266D0A75C99A37C /* SettingsView.swift */; };
 		427100181898107B29815ACA /* ConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66D0E6AEBC864380411BA87 /* ConfigStore.swift */; };
+		46F108C704127AD4761F9633 /* ScreenViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFA1B6F082906CC551643E4E /* ScreenViewModels.swift */; };
 		4A0F02E4B8782DEF917DC718 /* NewsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0350A0782258D93B3BC1595A /* NewsService.swift */; };
 		4E3677FD1DF79D810206FA60 /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E01CCAEC84A7B6B8382510D8 /* GoogleCalendarService.swift */; };
 		4F10015116E73D61BE4173A0 /* GoogleAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C34DD89BE1E529EF6A1D41 /* GoogleAuthStore.swift */; };
 		51FD556D1737984A0223C232 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 887A40B4B58FFD513719E657 /* RootView.swift */; };
+		52D0D43B2B399F6DD31FEF25 /* WidgetSnapshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8AE52B6281B10176A78F05C /* WidgetSnapshotSync.swift */; };
 		5583B96988B6CD89B6F02D48 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19B093008064DA3E21522253 /* NotificationScheduler.swift */; };
+		5A0879BE3D70B83EDB8F964C /* FocusLocalServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7928C5CE2CCD36C5C51A03B /* FocusLocalServer.swift */; };
 		5C4231737DDCEDFA2E9BC4BE /* MarketNewsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD48C14722622AD5D0A397B /* MarketNewsStore.swift */; };
-		A10000000000000000000041 /* StageStoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* StageStoreCache.swift */; };
-		A10000000000000000000060 /* AppDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000050 /* AppDatabase.swift */; };
-		A10000000000000000000061 /* StageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000051 /* StageRepository.swift */; };
-		A10000000000000000000062 /* TodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000052 /* TodoRepository.swift */; };
-		A10000000000000000000063 /* CalendarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* CalendarRepository.swift */; };
-		A10000000000000000000064 /* ScreenViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000054 /* ScreenViewModels.swift */; };
 		6057B882BE5C78C6F45D40DF /* StagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D9219B20DF3DAC5E112FD1 /* StagesView.swift */; };
 		60C681ABE3B9A88C9CCC9526 /* DiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79EA1D57C85801CD38176ADB /* DiagnosticsStore.swift */; };
+		6D7BAE34808EAFA245D51823 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = C72FA7C8272AB3E1D86869CB /* GRDB */; };
+		6EC706BE733471A68FA5B2E2 /* NotionDashboardWidgets-iOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 857FEB590B261BA7DDDF795B /* NotionDashboardWidgets-iOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6FAB6F11F3D1F674DCBE555D /* AppDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A4445B02DA3D9AF4C8B17E0 /* AppDatabase.swift */; };
 		729556888B89C316E04F096C /* MarketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA85C8040AA4B8330A86F01F /* MarketService.swift */; };
 		72E913D0622D48CB7167974E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9DC7A9E4266D0A75C99A37C /* SettingsView.swift */; };
 		731E62BFA7766272D19D2085 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B57DEE06707D14A660DA8B /* AppContainer.swift */; };
+		753EBB880F2C358C1F4744EC /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF6CC9DA562F644657AC08F /* AppRoute.swift */; };
 		757090712A5BD7E8B1EB02A4 /* GoogleAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C34DD89BE1E529EF6A1D41 /* GoogleAuthStore.swift */; };
+		764FA6FA95C34516628E387D /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF6CC9DA562F644657AC08F /* AppRoute.swift */; };
 		76B2B4CF8BCA3D68FC9EC7AF /* FocusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF22913667630F6A1D5066C2 /* FocusStore.swift */; };
 		7986F2E48CB0E514B0AB5AD2 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB301B5FAA11F6C07AA07B7 /* NotionClient.swift */; };
 		7B0560FBA1373CEB2C099DCA /* StagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D9219B20DF3DAC5E112FD1 /* StagesView.swift */; };
+		7EAAC93161F47EAB54DA6F99 /* TodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF586935AB0858EAD63A5A86 /* TodoRepository.swift */; };
 		7F3EB794921EC5E4421956FB /* Date+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F93D3AC3E858B199D591C6 /* Date+Helpers.swift */; };
+		8859EB5E4771285FA9C7E718 /* TodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF586935AB0858EAD63A5A86 /* TodoRepository.swift */; };
+		8A3AAAB0CA7E67AF170E713D /* FocusMenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F4CFC462F7D9612221B596D /* FocusMenuBarPanel.swift */; };
+		8A55281439CD0E4586097E6B /* CalendarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CE75F05FCC4AF6A4276877 /* CalendarRepository.swift */; };
+		8BF0C2B753ED0B89CF1B4919 /* StageStoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8F6DC2DAD9BEA8AD886B45 /* StageStoreCache.swift */; };
+		8F868E07DFDD3CA0961F6861 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */; };
 		96C518ECF002062ACBCB96D5 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38EB7F726AAF40B97960266 /* DashboardView.swift */; };
 		993269764CEB5464CB005921 /* UpdateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CE65E51C36F68CFF550A46 /* UpdateStore.swift */; };
-		A10000000000000000000011 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* AppRoute.swift */; };
-		A10000000000000000000012 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* AppRoute.swift */; };
-		A10000000000000000000013 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* WidgetData.swift */; };
-		A10000000000000000000014 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* WidgetData.swift */; };
-		A10000000000000000000015 /* WidgetSnapshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* WidgetSnapshotSync.swift */; };
-		A10000000000000000000016 /* WidgetSnapshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* WidgetSnapshotSync.swift */; };
-		A10000000000000000000017 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* WidgetData.swift */; };
-		A10000000000000000000018 /* NotionDashboardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* NotionDashboardWidgets.swift */; };
-		A10000000000000000000019 /* NotionDashboardWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* NotionDashboardWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A20000000000000000000011 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Assets.xcassets */; };
-		A20000000000000000000012 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Assets.xcassets */; };
+		9DC9B41CC7F026F90829BFDE /* AppSupportDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F773E96ADEDF547E0979D82 /* AppSupportDirectory.swift */; };
 		A3052DDEB30AF65C28B08970 /* WorkspaceChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3239F0AD2A525011A89B9A9 /* WorkspaceChrome.swift */; };
+		A6249659AD7A01954411AD49 /* AppDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A4445B02DA3D9AF4C8B17E0 /* AppDatabase.swift */; };
+		A65911F92FF79CBCD9653C4C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B96624D65A2FBDA03E1189D0 /* Sparkle */; };
 		A9246007F042EF1E8C5FAF0C /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38EB7F726AAF40B97960266 /* DashboardView.swift */; };
+		AA3366D3F90B1BADA5761CE8 /* CalendarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CE75F05FCC4AF6A4276877 /* CalendarRepository.swift */; };
+		AE4C4880225A1644275C81D9 /* StageStoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8F6DC2DAD9BEA8AD886B45 /* StageStoreCache.swift */; };
+		AF0FCA111E76718712F65B9E /* NotionDashboardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9EF647CF29B57F05D03E1EB /* NotionDashboardWidgets.swift */; };
+		B2D8CACF1C9E76E6082654A0 /* FocusLocalServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7928C5CE2CCD36C5C51A03B /* FocusLocalServer.swift */; };
 		B3126E1AE032322BA1B278BC /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F279728D650243FAF285C3B8 /* Models.swift */; };
 		B3F6735010E845A13AA926D5 /* NotionDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF9B068D8AACDE70F104894 /* NotionDashboardApp.swift */; };
 		B4EC5F58CFBDC24631E5FCDF /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F139472C3746AA2440A2F26 /* CalendarView.swift */; };
 		B844358458BB40833D4D93CA /* ConnectionsTextDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C09A021CC2E4C72DD9B91B0 /* ConnectionsTextDocument.swift */; };
+		C0953D8D29FFF0781C6DDABC /* ProtectedLinkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977815719EB7CFA795B63BC6 /* ProtectedLinkButton.swift */; };
+		C212F466466BBB6AF63FDF9C /* StageRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A96C9BBA43BFEB64C6820E /* StageRepository.swift */; };
 		C904F1E8F0692E9639A1FB06 /* View+Platform.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEAEB7D327B73238DB8681A2 /* View+Platform.swift */; };
 		CCFB2C2DE1D31BDE86345389 /* MarketNewsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD48C14722622AD5D0A397B /* MarketNewsStore.swift */; };
 		CE823F3DD188BB2FD6F85680 /* ICSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BB2F401B4B8476FE87163A /* ICSService.swift */; };
@@ -81,108 +88,127 @@
 		E3BE745F206331CDE067DC95 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B57DEE06707D14A660DA8B /* AppContainer.swift */; };
 		E89F35CDC30EC9B3F5F02973 /* NewsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0350A0782258D93B3BC1595A /* NewsService.swift */; };
 		EBCE5E49088104F5AFF653F8 /* Date+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74F93D3AC3E858B199D591C6 /* Date+Helpers.swift */; };
+		EBE66C63AFE5C9331243CB11 /* FocusMenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F4CFC462F7D9612221B596D /* FocusMenuBarPanel.swift */; };
 		ED3A0C7249641437247532A3 /* FocusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF22913667630F6A1D5066C2 /* FocusStore.swift */; };
 		EE6B62C35E04DC6071A0DF8A /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F139472C3746AA2440A2F26 /* CalendarView.swift */; };
 		F264B44333644CF4B53E1BA2 /* NotionDashboardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF9B068D8AACDE70F104894 /* NotionDashboardApp.swift */; };
-		F363947593351C4F5E110FAE /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = B96624D65A2FBDA03E1189D0 /* Sparkle */; };
+		F363947593351C4F5E110FAE /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 90755EA9AF97FA4BAF5E8AF8 /* GRDB */; };
 		F6C83BFCEFAEAEC6E3F2BACA /* StageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438289F7A35B4CF5A073E423 /* StageCardView.swift */; };
 		F6E86DBCAF74C6C5DC96605E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F279728D650243FAF285C3B8 /* Models.swift */; };
+		F716A0109D6A1495F9154A30 /* WidgetSnapshotSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8AE52B6281B10176A78F05C /* WidgetSnapshotSync.swift */; };
+		F96377C535EAA82B7A03845E /* NotionDashboardWidgets-macOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 079F497B3863F7A0E16BB81B /* NotionDashboardWidgets-macOS.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		FCD3BEF0F37284757E241FCB /* UpdateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CE65E51C36F68CFF550A46 /* UpdateStore.swift */; };
+		FD0E96984E9462EB42A48BEC /* NotionDashboardWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9EF647CF29B57F05D03E1EB /* NotionDashboardWidgets.swift */; };
 		FE557A586149178E1405E9E3 /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB301B5FAA11F6C07AA07B7 /* NotionClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		A10000000000000000000035 /* PBXContainerItemProxy */ = {
+		124D92C508F330ECB6C9BB98 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A01B0E33731B7D7F738476EB /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A10000000000000000000031;
-			remoteInfo = NotionDashboardWidgets;
+			remoteGlobalIDString = AAE6E50F449B859FD0B7E7CE;
+			remoteInfo = "NotionDashboardWidgets-iOS";
+		};
+		C37262638D00F590F12BF8DE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A01B0E33731B7D7F738476EB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D329F64F9EF628DC5E96263B;
+			remoteInfo = "NotionDashboardWidgets-macOS";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		A10000000000000000000023 /* Embed App Extensions */ = {
+		45AE90D711B8381BC7817D28 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				A10000000000000000000019 /* NotionDashboardWidgets.appex in Embed App Extensions */,
+				6EC706BE733471A68FA5B2E2 /* NotionDashboardWidgets-iOS.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAE3027D053F9033E8C20888 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F96377C535EAA82B7A03845E /* NotionDashboardWidgets-macOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0350A0782258D93B3BC1595A /* NewsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsService.swift; sourceTree = "<group>"; };
+		079F497B3863F7A0E16BB81B /* NotionDashboardWidgets-macOS.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "NotionDashboardWidgets-macOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		11C34DD89BE1E529EF6A1D41 /* GoogleAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleAuthStore.swift; sourceTree = "<group>"; };
 		19B093008064DA3E21522253 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		2CD48C14722622AD5D0A397B /* MarketNewsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketNewsStore.swift; sourceTree = "<group>"; };
+		2EF6CC9DA562F644657AC08F /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
+		2F4CFC462F7D9612221B596D /* FocusMenuBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusMenuBarPanel.swift; sourceTree = "<group>"; };
 		3AAD8EF815DF2E5A01538D50 /* CalendarStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarStore.swift; sourceTree = "<group>"; };
 		438289F7A35B4CF5A073E423 /* StageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageCardView.swift; sourceTree = "<group>"; };
 		4C09A021CC2E4C72DD9B91B0 /* ConnectionsTextDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsTextDocument.swift; sourceTree = "<group>"; };
 		4F139472C3746AA2440A2F26 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		5134E24BA5C8DB950354423C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		56D9219B20DF3DAC5E112FD1 /* StagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StagesView.swift; sourceTree = "<group>"; };
+		5A4445B02DA3D9AF4C8B17E0 /* AppDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDatabase.swift; sourceTree = "<group>"; };
 		65BB2F401B4B8476FE87163A /* ICSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICSService.swift; sourceTree = "<group>"; };
+		6C8F6DC2DAD9BEA8AD886B45 /* StageStoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageStoreCache.swift; sourceTree = "<group>"; };
 		6DB301B5FAA11F6C07AA07B7 /* NotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionClient.swift; sourceTree = "<group>"; };
+		6F773E96ADEDF547E0979D82 /* AppSupportDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupportDirectory.swift; sourceTree = "<group>"; };
 		74F93D3AC3E858B199D591C6 /* Date+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Helpers.swift"; sourceTree = "<group>"; };
 		79EA1D57C85801CD38176ADB /* DiagnosticsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsStore.swift; sourceTree = "<group>"; };
+		857FEB590B261BA7DDDF795B /* NotionDashboardWidgets-iOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = "NotionDashboardWidgets-iOS.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		87A96C9BBA43BFEB64C6820E /* StageRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageRepository.swift; sourceTree = "<group>"; };
 		887A40B4B58FFD513719E657 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		8A4511B6A4104663D97F71B4 /* PipelineImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineImportService.swift; sourceTree = "<group>"; };
+		977815719EB7CFA795B63BC6 /* ProtectedLinkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedLinkButton.swift; sourceTree = "<group>"; };
 		97B57DEE06707D14A660DA8B /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
-		A10000000000000000000001 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
-		A10000000000000000000002 /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
-		A10000000000000000000003 /* WidgetSnapshotSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotSync.swift; sourceTree = "<group>"; };
-		A10000000000000000000004 /* NotionDashboardWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionDashboardWidgets.swift; sourceTree = "<group>"; };
-		A10000000000000000000005 /* NotionDashboardWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; name = NotionDashboardWidgets.appex; path = DashboardWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000040 /* StageStoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageStoreCache.swift; sourceTree = "<group>"; };
-		A10000000000000000000050 /* AppDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDatabase.swift; sourceTree = "<group>"; };
-		A10000000000000000000051 /* StageRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageRepository.swift; sourceTree = "<group>"; };
-		A10000000000000000000052 /* TodoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoRepository.swift; sourceTree = "<group>"; };
-		A10000000000000000000053 /* CalendarRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarRepository.swift; sourceTree = "<group>"; };
-		A10000000000000000000054 /* ScreenViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewModels.swift; sourceTree = "<group>"; };
-		A10000000000000000000026 /* ProtectedLinkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedLinkButton.swift; sourceTree = "<group>"; };
-		A20000000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A802A0B5FDE842FF9FDD5877 /* NotionDashboard-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = "NotionDashboard-macOS.app"; path = Dashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A802A0B5FDE842FF9FDD5877 /* NotionDashboard-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "NotionDashboard-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9DC7A9E4266D0A75C99A37C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B3239F0AD2A525011A89B9A9 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		B66D0E6AEBC864380411BA87 /* ConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigStore.swift; sourceTree = "<group>"; };
 		BF22913667630F6A1D5066C2 /* FocusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStore.swift; sourceTree = "<group>"; };
+		C9EF647CF29B57F05D03E1EB /* NotionDashboardWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionDashboardWidgets.swift; sourceTree = "<group>"; };
+		CFA1B6F082906CC551643E4E /* ScreenViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewModels.swift; sourceTree = "<group>"; };
+		D7928C5CE2CCD36C5C51A03B /* FocusLocalServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusLocalServer.swift; sourceTree = "<group>"; };
+		D8AE52B6281B10176A78F05C /* WidgetSnapshotSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotSync.swift; sourceTree = "<group>"; };
 		DA85C8040AA4B8330A86F01F /* MarketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketService.swift; sourceTree = "<group>"; };
 		E01CCAEC84A7B6B8382510D8 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
 		E0CE65E51C36F68CFF550A46 /* UpdateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateStore.swift; sourceTree = "<group>"; };
+		EF586935AB0858EAD63A5A86 /* TodoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoRepository.swift; sourceTree = "<group>"; };
+		F0CE75F05FCC4AF6A4276877 /* CalendarRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarRepository.swift; sourceTree = "<group>"; };
 		F279728D650243FAF285C3B8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		F38EB7F726AAF40B97960266 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		F6FD1AF4A9C129B9258D07B7 /* Dashboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dashboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6FD1AF4A9C129B9258D07B7 /* NotionDashboard-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "NotionDashboard-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA18B39F41FF245D0332DE35 /* StageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageStore.swift; sourceTree = "<group>"; };
 		FBF9B068D8AACDE70F104894 /* NotionDashboardApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionDashboardApp.swift; sourceTree = "<group>"; };
 		FEAEB7D327B73238DB8681A2 /* View+Platform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Platform.swift"; sourceTree = "<group>"; };
+		FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000000000074 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				A10000000000000000000072 /* GRDB in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		6A89835BAE8EA9D1E5381A2F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000073 /* GRDB in Frameworks */,
-				F363947593351C4F5E110FAE /* Sparkle in Frameworks */,
+				F363947593351C4F5E110FAE /* GRDB in Frameworks */,
+				A65911F92FF79CBCD9653C4C /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A10000000000000000000022 /* Frameworks */ = {
+		C76F2CBEEF9456A3B4DFE557 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6D7BAE34808EAFA245D51823 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -193,15 +219,25 @@
 			isa = PBXGroup;
 			children = (
 				89B19B00CF7D86D6D20E06B0 /* Sources */,
+				347C10C2CF14F0241E35E4A5 /* Widgets */,
 				98C27D0711C40CC8475675D4 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		347C10C2CF14F0241E35E4A5 /* Widgets */ = {
+			isa = PBXGroup;
+			children = (
+				C9EF647CF29B57F05D03E1EB /* NotionDashboardWidgets.swift */,
+			);
+			name = Widgets;
+			path = Sources/Widgets;
 			sourceTree = "<group>";
 		};
 		36D885BA193D8ECDF5E66F3E /* Shared */ = {
 			isa = PBXGroup;
 			children = (
 				4C09A021CC2E4C72DD9B91B0 /* ConnectionsTextDocument.swift */,
-				A10000000000000000000026 /* ProtectedLinkButton.swift */,
+				977815719EB7CFA795B63BC6 /* ProtectedLinkButton.swift */,
 				438289F7A35B4CF5A073E423 /* StageCardView.swift */,
 				FEAEB7D327B73238DB8681A2 /* View+Platform.swift */,
 				B3239F0AD2A525011A89B9A9 /* WorkspaceChrome.swift */,
@@ -221,12 +257,11 @@
 		89B19B00CF7D86D6D20E06B0 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				5134E24BA5C8DB950354423C /* Assets.xcassets */,
 				D1C08B570D6E4D4D277A6E2E /* App */,
-				A20000000000000000000001 /* Assets.xcassets */,
 				87756641C2B9800C3E3D5C2F /* Core */,
 				F640184912A6B18D5CDBD76A /* Services */,
 				E0E2045257CE6EC299471D36 /* Views */,
-				A10000000000000000000006 /* Widgets */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -234,26 +269,20 @@
 		98C27D0711C40CC8475675D4 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F6FD1AF4A9C129B9258D07B7 /* Dashboard.app */,
+				F6FD1AF4A9C129B9258D07B7 /* NotionDashboard-iOS.app */,
 				A802A0B5FDE842FF9FDD5877 /* NotionDashboard-macOS.app */,
-				A10000000000000000000005 /* NotionDashboardWidgets.appex */,
+				857FEB590B261BA7DDDF795B /* NotionDashboardWidgets-iOS.appex */,
+				079F497B3863F7A0E16BB81B /* NotionDashboardWidgets-macOS.appex */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A10000000000000000000006 /* Widgets */ = {
-			isa = PBXGroup;
-			children = (
-				A10000000000000000000004 /* NotionDashboardWidgets.swift */,
-			);
-			path = Widgets;
 			sourceTree = "<group>";
 		};
 		D1C08B570D6E4D4D277A6E2E /* App */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000001 /* AppRoute.swift */,
 				97B57DEE06707D14A660DA8B /* AppContainer.swift */,
+				2EF6CC9DA562F644657AC08F /* AppRoute.swift */,
+				2F4CFC462F7D9612221B596D /* FocusMenuBarPanel.swift */,
 				FBF9B068D8AACDE70F104894 /* NotionDashboardApp.swift */,
 				887A40B4B58FFD513719E657 /* RootView.swift */,
 			);
@@ -275,9 +304,13 @@
 		F640184912A6B18D5CDBD76A /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				5A4445B02DA3D9AF4C8B17E0 /* AppDatabase.swift */,
+				6F773E96ADEDF547E0979D82 /* AppSupportDirectory.swift */,
+				F0CE75F05FCC4AF6A4276877 /* CalendarRepository.swift */,
 				3AAD8EF815DF2E5A01538D50 /* CalendarStore.swift */,
 				B66D0E6AEBC864380411BA87 /* ConfigStore.swift */,
 				79EA1D57C85801CD38176ADB /* DiagnosticsStore.swift */,
+				D7928C5CE2CCD36C5C51A03B /* FocusLocalServer.swift */,
 				BF22913667630F6A1D5066C2 /* FocusStore.swift */,
 				11C34DD89BE1E529EF6A1D41 /* GoogleAuthStore.swift */,
 				E01CCAEC84A7B6B8382510D8 /* GoogleCalendarService.swift */,
@@ -287,17 +320,15 @@
 				0350A0782258D93B3BC1595A /* NewsService.swift */,
 				19B093008064DA3E21522253 /* NotificationScheduler.swift */,
 				6DB301B5FAA11F6C07AA07B7 /* NotionClient.swift */,
-				A10000000000000000000050 /* AppDatabase.swift */,
-				A10000000000000000000053 /* CalendarRepository.swift */,
 				8A4511B6A4104663D97F71B4 /* PipelineImportService.swift */,
-				A10000000000000000000054 /* ScreenViewModels.swift */,
+				CFA1B6F082906CC551643E4E /* ScreenViewModels.swift */,
+				87A96C9BBA43BFEB64C6820E /* StageRepository.swift */,
 				FA18B39F41FF245D0332DE35 /* StageStore.swift */,
+				6C8F6DC2DAD9BEA8AD886B45 /* StageStoreCache.swift */,
+				EF586935AB0858EAD63A5A86 /* TodoRepository.swift */,
 				E0CE65E51C36F68CFF550A46 /* UpdateStore.swift */,
-				A10000000000000000000051 /* StageRepository.swift */,
-				A10000000000000000000002 /* WidgetData.swift */,
-				A10000000000000000000003 /* WidgetSnapshotSync.swift */,
-				A10000000000000000000040 /* StageStoreCache.swift */,
-				A10000000000000000000052 /* TodoRepository.swift */,
+				FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */,
+				D8AE52B6281B10176A78F05C /* WidgetSnapshotSync.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -310,37 +341,55 @@
 			buildConfigurationList = 4AFC19B2F05D87CF21AEBDB9 /* Build configuration list for PBXNativeTarget "NotionDashboard-iOS" */;
 			buildPhases = (
 				3F58D6DB8BD088A09BD16AB2 /* Sources */,
-				A10000000000000000000074 /* Frameworks */,
-				A20000000000000000000021 /* Resources */,
+				CA9B3666B3818A5AD0D9DF89 /* Resources */,
+				C76F2CBEEF9456A3B4DFE557 /* Frameworks */,
+				45AE90D711B8381BC7817D28 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6A75E20DE434D1D97592710F /* PBXTargetDependency */,
 			);
 			name = "NotionDashboard-iOS";
 			packageProductDependencies = (
-				A10000000000000000000071 /* GRDB */,
+				C72FA7C8272AB3E1D86869CB /* GRDB */,
 			);
 			productName = "NotionDashboard-iOS";
-			productReference = F6FD1AF4A9C129B9258D07B7 /* Dashboard.app */;
+			productReference = F6FD1AF4A9C129B9258D07B7 /* NotionDashboard-iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A10000000000000000000031 /* NotionDashboardWidgets */ = {
+		AAE6E50F449B859FD0B7E7CE /* NotionDashboardWidgets-iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000032 /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets" */;
+			buildConfigurationList = CCC126A154BFCF00809E796C /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets-iOS" */;
 			buildPhases = (
-				A10000000000000000000021 /* Sources */,
-				A10000000000000000000022 /* Frameworks */,
+				57920A62DCA83B5BBAB5A29D /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = NotionDashboardWidgets;
+			name = "NotionDashboardWidgets-iOS";
 			packageProductDependencies = (
 			);
-			productName = NotionDashboardWidgets;
-			productReference = A10000000000000000000005 /* NotionDashboardWidgets.appex */;
+			productName = "NotionDashboardWidgets-iOS";
+			productReference = 857FEB590B261BA7DDDF795B /* NotionDashboardWidgets-iOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D329F64F9EF628DC5E96263B /* NotionDashboardWidgets-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D5E1D15519C0617E5A1D262 /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets-macOS" */;
+			buildPhases = (
+				19D3C2761EFF6585C8C66AD7 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "NotionDashboardWidgets-macOS";
+			packageProductDependencies = (
+			);
+			productName = "NotionDashboardWidgets-macOS";
+			productReference = 079F497B3863F7A0E16BB81B /* NotionDashboardWidgets-macOS.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		ED53501E83B232D58C0AF94C /* NotionDashboard-macOS */ = {
@@ -348,18 +397,18 @@
 			buildConfigurationList = 6051A1559386284C46FBF1C4 /* Build configuration list for PBXNativeTarget "NotionDashboard-macOS" */;
 			buildPhases = (
 				BA3CDE9AE50DB234FC7E055E /* Sources */,
+				156AA79D31FA97EAAE568995 /* Resources */,
 				6A89835BAE8EA9D1E5381A2F /* Frameworks */,
-				A20000000000000000000022 /* Resources */,
-				A10000000000000000000023 /* Embed App Extensions */,
+				CAE3027D053F9033E8C20888 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				A10000000000000000000036 /* PBXTargetDependency */,
+				7AAFC70F089AFBD4D5F3B5B5 /* PBXTargetDependency */,
 			);
 			name = "NotionDashboard-macOS";
 			packageProductDependencies = (
-				A10000000000000000000071 /* GRDB */,
+				90755EA9AF97FA4BAF5E8AF8 /* GRDB */,
 				B96624D65A2FBDA03E1189D0 /* Sparkle */,
 			);
 			productName = "NotionDashboard-macOS";
@@ -375,10 +424,12 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1540;
 				TargetAttributes = {
-					A10000000000000000000031 = {
+					D329F64F9EF628DC5E96263B = {
+						DevelopmentTeam = 23NR88847P;
 						ProvisioningStyle = Automatic;
 					};
 					ED53501E83B232D58C0AF94C = {
+						DevelopmentTeam = 23NR88847P;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -394,7 +445,7 @@
 			mainGroup = 08BA1CEDD210C68CDC329F68;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A10000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				EECE695116B23DBF1B31FE58 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				18FA0CFC52952D2A8065B91F /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = 98C27D0711C40CC8475675D4 /* Products */;
@@ -403,39 +454,50 @@
 			targets = (
 				43C5154EFE11FEE1463E6E05 /* NotionDashboard-iOS */,
 				ED53501E83B232D58C0AF94C /* NotionDashboard-macOS */,
-				A10000000000000000000031 /* NotionDashboardWidgets */,
+				AAE6E50F449B859FD0B7E7CE /* NotionDashboardWidgets-iOS */,
+				D329F64F9EF628DC5E96263B /* NotionDashboardWidgets-macOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A20000000000000000000021 /* Resources */ = {
+		156AA79D31FA97EAAE568995 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A20000000000000000000011 /* Assets.xcassets in Resources */,
+				34260D1F17D3CAAC8433720C /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A20000000000000000000022 /* Resources */ = {
+		CA9B3666B3818A5AD0D9DF89 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A20000000000000000000012 /* Assets.xcassets in Resources */,
+				269693A4D6AF42008E188170 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		19D3C2761EFF6585C8C66AD7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD0E96984E9462EB42A48BEC /* NotionDashboardWidgets.swift in Sources */,
+				8F868E07DFDD3CA0961F6861 /* WidgetData.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3F58D6DB8BD088A09BD16AB2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000011 /* AppRoute.swift in Sources */,
-				A10000000000000000000055 /* AppDatabase.swift in Sources */,
 				731E62BFA7766272D19D2085 /* AppContainer.swift in Sources */,
-				A10000000000000000000058 /* CalendarRepository.swift in Sources */,
+				6FAB6F11F3D1F674DCBE555D /* AppDatabase.swift in Sources */,
+				753EBB880F2C358C1F4744EC /* AppRoute.swift in Sources */,
+				9DC9B41CC7F026F90829BFDE /* AppSupportDirectory.swift in Sources */,
+				AA3366D3F90B1BADA5761CE8 /* CalendarRepository.swift in Sources */,
 				E21000616F6265B3FCD88115 /* CalendarStore.swift in Sources */,
 				B4EC5F58CFBDC24631E5FCDF /* CalendarView.swift in Sources */,
 				427100181898107B29815ACA /* ConfigStore.swift in Sources */,
@@ -443,6 +505,8 @@
 				96C518ECF002062ACBCB96D5 /* DashboardView.swift in Sources */,
 				EBCE5E49088104F5AFF653F8 /* Date+Helpers.swift in Sources */,
 				60C681ABE3B9A88C9CCC9526 /* DiagnosticsStore.swift in Sources */,
+				5A0879BE3D70B83EDB8F964C /* FocusLocalServer.swift in Sources */,
+				8A3AAAB0CA7E67AF170E713D /* FocusMenuBarPanel.swift in Sources */,
 				ED3A0C7249641437247532A3 /* FocusStore.swift in Sources */,
 				757090712A5BD7E8B1EB02A4 /* GoogleAuthStore.swift in Sources */,
 				4E3677FD1DF79D810206FA60 /* GoogleCalendarService.swift in Sources */,
@@ -455,30 +519,30 @@
 				7986F2E48CB0E514B0AB5AD2 /* NotionClient.swift in Sources */,
 				B3F6735010E845A13AA926D5 /* NotionDashboardApp.swift in Sources */,
 				CF4C0C776F14EFE76DBE36C4 /* PipelineImportService.swift in Sources */,
+				C0953D8D29FFF0781C6DDABC /* ProtectedLinkButton.swift in Sources */,
 				04E79FD830236148CAEB2C91 /* RootView.swift in Sources */,
-				A10000000000000000000059 /* ScreenViewModels.swift in Sources */,
+				46F108C704127AD4761F9633 /* ScreenViewModels.swift in Sources */,
 				3E01E11126BD9AFFF5076448 /* SettingsView.swift in Sources */,
-				A10000000000000000000027 /* ProtectedLinkButton.swift in Sources */,
 				F6C83BFCEFAEAEC6E3F2BACA /* StageCardView.swift in Sources */,
-				A10000000000000000000056 /* StageRepository.swift in Sources */,
+				3CC7152EA09CBA742D2D2393 /* StageRepository.swift in Sources */,
 				3388D8C4ACFC350EEC5325FE /* StageStore.swift in Sources */,
-				A10000000000000000000041 /* StageStoreCache.swift in Sources */,
+				8BF0C2B753ED0B89CF1B4919 /* StageStoreCache.swift in Sources */,
 				7B0560FBA1373CEB2C099DCA /* StagesView.swift in Sources */,
-				A10000000000000000000057 /* TodoRepository.swift in Sources */,
+				8859EB5E4771285FA9C7E718 /* TodoRepository.swift in Sources */,
 				993269764CEB5464CB005921 /* UpdateStore.swift in Sources */,
 				DA4F8EF9A1CDD309792E895F /* View+Platform.swift in Sources */,
-				A10000000000000000000013 /* WidgetData.swift in Sources */,
-				A10000000000000000000015 /* WidgetSnapshotSync.swift in Sources */,
+				104F2F5C65788A6247BD15EC /* WidgetData.swift in Sources */,
+				F716A0109D6A1495F9154A30 /* WidgetSnapshotSync.swift in Sources */,
 				A3052DDEB30AF65C28B08970 /* WorkspaceChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A10000000000000000000021 /* Sources */ = {
+		57920A62DCA83B5BBAB5A29D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000017 /* WidgetData.swift in Sources */,
-				A10000000000000000000018 /* NotionDashboardWidgets.swift in Sources */,
+				AF0FCA111E76718712F65B9E /* NotionDashboardWidgets.swift in Sources */,
+				02309D3F9C7A4D5C23BB2798 /* WidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -486,10 +550,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000012 /* AppRoute.swift in Sources */,
-				A10000000000000000000060 /* AppDatabase.swift in Sources */,
 				E3BE745F206331CDE067DC95 /* AppContainer.swift in Sources */,
-				A10000000000000000000063 /* CalendarRepository.swift in Sources */,
+				A6249659AD7A01954411AD49 /* AppDatabase.swift in Sources */,
+				764FA6FA95C34516628E387D /* AppRoute.swift in Sources */,
+				378C1E1EF76B89B9BBDA8529 /* AppSupportDirectory.swift in Sources */,
+				8A55281439CD0E4586097E6B /* CalendarRepository.swift in Sources */,
 				E0910E67A209BC87F1E64331 /* CalendarStore.swift in Sources */,
 				EE6B62C35E04DC6071A0DF8A /* CalendarView.swift in Sources */,
 				D043D8D16610BF217D8C9932 /* ConfigStore.swift in Sources */,
@@ -497,6 +562,8 @@
 				A9246007F042EF1E8C5FAF0C /* DashboardView.swift in Sources */,
 				7F3EB794921EC5E4421956FB /* Date+Helpers.swift in Sources */,
 				D16CB868781D68AF8EB00B92 /* DiagnosticsStore.swift in Sources */,
+				B2D8CACF1C9E76E6082654A0 /* FocusLocalServer.swift in Sources */,
+				EBE66C63AFE5C9331243CB11 /* FocusMenuBarPanel.swift in Sources */,
 				76B2B4CF8BCA3D68FC9EC7AF /* FocusStore.swift in Sources */,
 				4F10015116E73D61BE4173A0 /* GoogleAuthStore.swift in Sources */,
 				1BA5DD8E6ECE5EBDD800A9E0 /* GoogleCalendarService.swift in Sources */,
@@ -509,20 +576,20 @@
 				FE557A586149178E1405E9E3 /* NotionClient.swift in Sources */,
 				F264B44333644CF4B53E1BA2 /* NotionDashboardApp.swift in Sources */,
 				0CC918A4C416F2B779866F7C /* PipelineImportService.swift in Sources */,
+				1D81E0B1E00F9E25157EF26A /* ProtectedLinkButton.swift in Sources */,
 				51FD556D1737984A0223C232 /* RootView.swift in Sources */,
-				A10000000000000000000064 /* ScreenViewModels.swift in Sources */,
+				286AA049199F3DEEBA941F53 /* ScreenViewModels.swift in Sources */,
 				72E913D0622D48CB7167974E /* SettingsView.swift in Sources */,
-				A10000000000000000000027 /* ProtectedLinkButton.swift in Sources */,
 				02106A8C760D05756CC2E965 /* StageCardView.swift in Sources */,
-				A10000000000000000000061 /* StageRepository.swift in Sources */,
+				C212F466466BBB6AF63FDF9C /* StageRepository.swift in Sources */,
 				245620D9C6C13DA4FE47A30A /* StageStore.swift in Sources */,
-				A10000000000000000000041 /* StageStoreCache.swift in Sources */,
+				AE4C4880225A1644275C81D9 /* StageStoreCache.swift in Sources */,
 				6057B882BE5C78C6F45D40DF /* StagesView.swift in Sources */,
-				A10000000000000000000062 /* TodoRepository.swift in Sources */,
+				7EAAC93161F47EAB54DA6F99 /* TodoRepository.swift in Sources */,
 				FCD3BEF0F37284757E241FCB /* UpdateStore.swift in Sources */,
 				C904F1E8F0692E9639A1FB06 /* View+Platform.swift in Sources */,
-				A10000000000000000000014 /* WidgetData.swift in Sources */,
-				A10000000000000000000016 /* WidgetSnapshotSync.swift in Sources */,
+				133C77AE0FA79BC0B72F49F3 /* WidgetData.swift in Sources */,
+				52D0D43B2B399F6DD31FEF25 /* WidgetSnapshotSync.swift in Sources */,
 				05AB055C3FAA1B46C9805E10 /* WorkspaceChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -530,10 +597,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A10000000000000000000036 /* PBXTargetDependency */ = {
+		6A75E20DE434D1D97592710F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A10000000000000000000031 /* NotionDashboardWidgets */;
-			targetProxy = A10000000000000000000035 /* PBXContainerItemProxy */;
+			target = AAE6E50F449B859FD0B7E7CE /* NotionDashboardWidgets-iOS */;
+			targetProxy = 124D92C508F330ECB6C9BB98 /* PBXContainerItemProxy */;
+		};
+		7AAFC70F089AFBD4D5F3B5B5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D329F64F9EF628DC5E96263B /* NotionDashboardWidgets-macOS */;
+			targetProxy = C37262638D00F590F12BF8DE /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -542,8 +614,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Config/iOS-Info.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 23NR88847P;
 				INFOPLIST_FILE = "Config/iOS-Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -555,6 +627,27 @@
 				PRODUCT_NAME = Dashboard;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		6000D7008472E391DF5C0E58 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Config/NotionDashboardWidgets-macOS.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 23NR88847P;
+				INFOPLIST_FILE = "Config/NotionDashboardWidgets-macOS-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.macos.widgets;
+				PRODUCT_NAME = NotionDashboardWidgets;
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
@@ -626,66 +719,51 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_ENTITLEMENTS = "Config/NotionDashboard-macOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "Config/macOS-Info.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 23NR88847P;
 				INFOPLIST_FILE = "Config/macOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-weak_framework",
-					AppIntents,
-				);
+				OTHER_LDFLAGS = "$(inherited) -weak_framework AppIntents";
 				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.macos;
 				PRODUCT_NAME = Dashboard;
 				SDKROOT = macosx;
 			};
 			name = Debug;
 		};
-		A10000000000000000000033 /* Debug */ = {
+		BE0F613E26290DD1291667F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
-				CODE_SIGN_ENTITLEMENTS = Config/NotionDashboardWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Config/NotionDashboardWidgets-macOS.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = "Config/NotionDashboardWidgets-Info.plist";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 23NR88847P;
+				INFOPLIST_FILE = "Config/NotionDashboardWidgets-macOS-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.macos.widgets;
-				PRODUCT_NAME = DashboardWidgets;
+				PRODUCT_NAME = NotionDashboardWidgets;
 				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
 			};
 			name = Debug;
-		};
-		A10000000000000000000034 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CODE_SIGN_ENTITLEMENTS = Config/NotionDashboardWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = "Config/NotionDashboardWidgets-Info.plist";
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.macos.widgets;
-				PRODUCT_NAME = DashboardWidgets;
-				SDKROOT = macosx;
-				SKIP_INSTALL = YES;
-			};
-			name = Release;
 		};
 		E5FE7D624FF7DA14886E0400 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Config/iOS-Info.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 23NR88847P;
 				INFOPLIST_FILE = "Config/iOS-Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -700,24 +778,41 @@
 			};
 			name = Debug;
 		};
+		EAEE3FE6E4A05308E0A4E618 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/NotionDashboardWidgets.entitlements;
+				INFOPLIST_FILE = "Config/NotionDashboardWidgets-Info.plist";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.ios.widgets;
+				PRODUCT_NAME = NotionDashboardWidgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		F2FE828E906325232C00E4EA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "Config/NotionDashboard-macOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "Config/macOS-Info.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 23NR88847P;
 				INFOPLIST_FILE = "Config/macOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-weak_framework",
-					AppIntents,
-				);
+				OTHER_LDFLAGS = "$(inherited) -weak_framework AppIntents";
 				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.macos;
 				PRODUCT_NAME = Dashboard;
 				SDKROOT = macosx;
@@ -781,6 +876,25 @@
 			};
 			name = Release;
 		};
+		FD56548444DBBC73C2B3BEFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/NotionDashboardWidgets.entitlements;
+				INFOPLIST_FILE = "Config/NotionDashboardWidgets-Info.plist";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.loldashboard.notiondashboard.ios.widgets;
+				PRODUCT_NAME = NotionDashboardWidgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -789,6 +903,15 @@
 			buildConfigurations = (
 				E5FE7D624FF7DA14886E0400 /* Debug */,
 				0EE9BC9A498FA04E30326ABE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4D5E1D15519C0617E5A1D262 /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets-macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BE0F613E26290DD1291667F3 /* Debug */,
+				6000D7008472E391DF5C0E58 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -802,20 +925,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		A10000000000000000000032 /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A10000000000000000000033 /* Debug */,
-				A10000000000000000000034 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
-		};
 		C8FA8A4F88F0D6B2D9EB53CB /* Build configuration list for PBXProject "NotionDashboardSwift" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6DA671ADED974E55BF1CAF31 /* Debug */,
 				F6E63063284E58DA18651426 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CCC126A154BFCF00809E796C /* Build configuration list for PBXNativeTarget "NotionDashboardWidgets-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FD56548444DBBC73C2B3BEFB /* Debug */,
+				EAEE3FE6E4A05308E0A4E618 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -831,26 +954,31 @@
 				minimumVersion = 2.9.1;
 			};
 		};
-		A10000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+		EECE695116B23DBF1B31FE58 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 6.29.3;
+				minimumVersion = 7.5.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A10000000000000000000071 /* GRDB */ = {
+		90755EA9AF97FA4BAF5E8AF8 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A10000000000000000000070 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			package = EECE695116B23DBF1B31FE58 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
 		B96624D65A2FBDA03E1189D0 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 18FA0CFC52952D2A8065B91F /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		C72FA7C8272AB3E1D86869CB /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EECE695116B23DBF1B31FE58 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -19,6 +19,24 @@ STAGING_DIR="$(mktemp -d /tmp/notion-dashboard-dmg.XXXXXX)"
 BUILD_LOG="$(mktemp -t notion-dashboard-build)"
 PRESERVE_BUILD_LOG="${PRESERVE_BUILD_LOG:-}"
 XCODEBUILD_OVERRIDES=()
+SIGNING_MODE="${ENABLE_CODE_SIGNING:-auto}"
+DETECTED_SIGNING="$(
+  security find-identity -v -p codesigning 2>/dev/null \
+    | sed -nE 's/^[[:space:]]*[0-9]+\) [A-F0-9]+ "(Apple Development: .*\([A-Z0-9]+\))".*/\1/p' \
+    | head -n 1 || true
+)"
+DETECTED_CODESIGN_IDENTITY=""
+if [[ -n "${DETECTED_SIGNING}" ]]; then
+  DETECTED_CODESIGN_IDENTITY="${DETECTED_SIGNING}"
+fi
+
+if [[ "${SIGNING_MODE}" == "auto" ]]; then
+  if [[ -n "${APPLE_TEAM_ID:-}" || -n "${APPLE_CODESIGN_IDENTITY:-}" || -n "${DETECTED_CODESIGN_IDENTITY}" ]]; then
+    SIGNING_MODE="1"
+  else
+    SIGNING_MODE="0"
+  fi
+fi
 
 if [[ -n "${MARKETING_VERSION_OVERRIDE:-}" ]]; then
   XCODEBUILD_OVERRIDES+=("MARKETING_VERSION=${MARKETING_VERSION_OVERRIDE}")
@@ -32,17 +50,17 @@ if [[ -n "${SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
   XCODEBUILD_OVERRIDES+=("SPARKLE_PUBLIC_ED_KEY=${SPARKLE_PUBLIC_ED_KEY}")
 fi
 
+if [[ "${SIGNING_MODE}" == "1" ]]; then
+  XCODEBUILD_OVERRIDES+=("CODE_SIGN_STYLE=Automatic")
+  XCODEBUILD_OVERRIDES+=("ENABLE_HARDENED_RUNTIME=YES")
+fi
+
 if [[ -n "${APPLE_TEAM_ID:-}" ]]; then
   XCODEBUILD_OVERRIDES+=("DEVELOPMENT_TEAM=${APPLE_TEAM_ID}")
 fi
 
 if [[ -n "${APPLE_CODESIGN_IDENTITY:-}" ]]; then
   XCODEBUILD_OVERRIDES+=("CODE_SIGN_IDENTITY=${APPLE_CODESIGN_IDENTITY}")
-fi
-
-if [[ "${ENABLE_CODE_SIGNING:-0}" == "1" ]]; then
-  XCODEBUILD_OVERRIDES+=("CODE_SIGN_STYLE=Manual")
-  XCODEBUILD_OVERRIDES+=("ENABLE_HARDENED_RUNTIME=YES")
 fi
 
 cleanup() {
@@ -108,10 +126,17 @@ log "generating Xcode project"
 cd "${SWIFT_DIR}"
 "${XCODEGEN}" generate --spec "${PROJECT_SPEC}" >/dev/null
 
+if [[ "${SIGNING_MODE}" == "1" ]]; then
+  log "building with Apple code signing"
+else
+  log "warning: no Apple code signing identity detected; macOS may not show WidgetKit extensions from this DMG"
+fi
+
 log "building macOS release app"
 xcodebuild_args=(
   -project "${PROJECT_PATH}"
   -scheme "${APP_SCHEME}"
+  -allowProvisioningUpdates
   -destination "platform=macOS,arch=arm64"
   -configuration Release
   -sdk macosx
@@ -119,9 +144,10 @@ xcodebuild_args=(
   "${XCODEBUILD_OVERRIDES[@]}"
 )
 
-if [[ "${ENABLE_CODE_SIGNING:-0}" != "1" ]]; then
+if [[ "${SIGNING_MODE}" != "1" ]]; then
   xcodebuild_args+=(
     CODE_SIGN_IDENTITY=""
+    CODE_SIGN_ENTITLEMENTS=""
     CODE_SIGNING_REQUIRED=NO
     CODE_SIGNING_ALLOWED=NO
   )
@@ -141,6 +167,36 @@ APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_NAME}"
 if [[ ! -d "${APP_PATH}" ]]; then
   echo "Built app not found: ${APP_PATH}" >&2
   exit 1
+fi
+
+if [[ "${SIGNING_MODE}" != "1" ]]; then
+  log "ad-hoc signing app bundle for local widget registration"
+  APP_ENTITLEMENTS="${SWIFT_DIR}/Config/macOS-Info.entitlements"
+  WIDGET_ENTITLEMENTS="${SWIFT_DIR}/Config/NotionDashboardWidgets-macOS.entitlements"
+
+  while IFS= read -r extension_path; do
+    codesign \
+      --force \
+      --sign - \
+      --timestamp=none \
+      --entitlements "${WIDGET_ENTITLEMENTS}" \
+      "${extension_path}" >/dev/null
+  done < <(find "${APP_PATH}/Contents/PlugIns" -maxdepth 1 -type d -name "*.appex" 2>/dev/null)
+
+  while IFS= read -r framework_path; do
+    codesign --force --deep --sign - --timestamp=none "${framework_path}" >/dev/null
+  done < <(find "${APP_PATH}/Contents/Frameworks" -maxdepth 1 -type d -name "*.framework" 2>/dev/null)
+
+  codesign \
+    --force \
+    --deep \
+    --sign - \
+    --timestamp=none \
+    --entitlements "${APP_ENTITLEMENTS}" \
+    "${APP_PATH}" >/dev/null
+  codesign --verify --deep --strict --verbose=2 "${APP_PATH}" >/dev/null
+else
+  codesign --verify --deep --strict --verbose=2 "${APP_PATH}" >/dev/null
 fi
 
 cd "${ROOT_DIR}"

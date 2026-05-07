@@ -17,6 +17,7 @@ private enum NotificationActionID {
 
 private enum NotificationCategoryID {
   static let calendarEvent = "CALENDAR_EVENT_CATEGORY"
+  static let focusSession = "FOCUS_SESSION_CATEGORY"
 }
 
 private struct NotificationEventPayload: Sendable {
@@ -72,6 +73,7 @@ final class NotificationScheduler: NSObject, ObservableObject {
   private let center = UNUserNotificationCenter.current()
   private let reminderHorizon: TimeInterval = 30 * 24 * 60 * 60
   private let maxPendingEventReminders = 48
+  private let dailySummaryIdentifier = "daily-summary"
   private weak var diagnostics: DiagnosticsStore?
   private weak var focusStore: FocusStore?
   private var lastScheduledSignature: String = ""
@@ -84,6 +86,46 @@ final class NotificationScheduler: NSObject, ObservableObject {
     registerCategory()
     Task {
       await refreshAuthorizationStatus()
+    }
+  }
+
+  func schedulePomodoroCompletionNotification(workMinutes: Int, breakMinutes: Int) async {
+    guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+      lastStatusMessage = "Notifications not authorized."
+      return
+    }
+
+    let content = UNMutableNotificationContent()
+    content.title = "Pomodoro complete"
+    content.body = "Work session finished. Break for \(max(1, breakMinutes)) minute(s)."
+    content.sound = .default
+    content.categoryIdentifier = NotificationCategoryID.focusSession
+
+    do {
+      try await center.add(
+        UNNotificationRequest(
+          identifier: "focus-complete-\(UUID().uuidString)",
+          content: content,
+          trigger: nil
+        )
+      )
+      lastStatusMessage = "Pomodoro completion notification sent."
+      diagnostics?.log(
+        category: "notifications",
+        message: lastStatusMessage,
+        metadata: [
+          "workMinutes": "\(max(1, workMinutes))",
+          "breakMinutes": "\(max(1, breakMinutes))"
+        ]
+      )
+    } catch {
+      lastStatusMessage = "Unable to send pomodoro notification."
+      diagnostics?.log(
+        severity: .warning,
+        category: "notifications",
+        message: lastStatusMessage,
+        metadata: ["error": error.localizedDescription]
+      )
     }
   }
 
@@ -185,6 +227,45 @@ final class NotificationScheduler: NSObject, ObservableObject {
     diagnostics?.log(category: "notifications", message: lastStatusMessage)
   }
 
+  func scheduleDailySummary(events: [CalendarEvent]) async {
+    guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+      lastStatusMessage = "Notifications not authorized."
+      return
+    }
+
+    let calendar = Calendar.current
+    let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date().addingTimeInterval(86_400)
+    let tomorrowEvents = events
+      .filter { calendar.isDate($0.start, inSameDayAs: tomorrow) }
+      .sorted { $0.start < $1.start }
+
+    let content = UNMutableNotificationContent()
+    content.title = "Tomorrow at a glance"
+    if tomorrowEvents.isEmpty {
+      content.body = "No calendar event is scheduled tomorrow."
+    } else {
+      let preview = tomorrowEvents.prefix(3).map { event in
+        event.isAllDay ? "All day: \(event.summary)" : "\(event.start.formatted(.dateTime.hour().minute())) \(event.summary)"
+      }.joined(separator: " • ")
+      content.body = "\(tomorrowEvents.count) event(s): \(preview)"
+    }
+    content.sound = .default
+
+    var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+    components.hour = 8
+    components.minute = 0
+    let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+    center.removePendingNotificationRequests(withIdentifiers: [dailySummaryIdentifier])
+    do {
+      try await center.add(UNNotificationRequest(identifier: dailySummaryIdentifier, content: content, trigger: trigger))
+      lastStatusMessage = "Daily summary scheduled for tomorrow at 08:00."
+      diagnostics?.log(category: "notifications", message: lastStatusMessage)
+    } catch {
+      lastStatusMessage = "Daily summary failed: \(error.localizedDescription)"
+      diagnostics?.log(severity: .warning, category: "notifications", message: lastStatusMessage)
+    }
+  }
+
   func removeEventNotifications() async {
     let pending = await center.pendingNotificationRequests()
     let ids = pending
@@ -228,7 +309,13 @@ final class NotificationScheduler: NSObject, ObservableObject {
       intentIdentifiers: [],
       options: [.customDismissAction]
     )
-    center.setNotificationCategories([category])
+    let focusCategory = UNNotificationCategory(
+      identifier: NotificationCategoryID.focusSession,
+      actions: [],
+      intentIdentifiers: [],
+      options: []
+    )
+    center.setNotificationCategories([category, focusCategory])
   }
 
   private func scheduleSnooze(from payload: NotificationEventPayload, minutes: Int) async {

@@ -106,25 +106,25 @@ final class StageStore: ObservableObject {
     )
 
     if configStore.config.hasNotionCredentials {
+      let resolvedPageID = resolvedNotionPageID(for: stageID)
       do {
-        if let notionPageID = notionPageID(for: updated) {
-          try await notionClient.updateStageStatus(pageID: notionPageID, status: newStatus, config: configStore.config)
-        } else {
+        guard let resolvedPageID else {
           await syncSingleStageIfPossible(stageID: stageID)
           return
         }
+        try await notionClient.updateStageStatus(pageID: resolvedPageID, status: newStatus, config: configStore.config)
         diagnostics?.log(
           category: "notion",
           message: "Stage status updated.",
-          metadata: ["stageID": stageID, "notionPageID": notionPageID(for: updated) ?? ""]
+          metadata: ["stageID": stageID, "notionPageID": resolvedPageID]
         )
       } catch {
         let queueItem: PendingNotionOperation
-        if let notionPageID = notionPageID(for: updated), isLikelyNotionPageID(notionPageID) {
+        if let resolvedPageID, isLikelyNotionPageID(resolvedPageID) {
           queueItem = PendingNotionOperation(
             kind: .updateStatus,
             stage: nil,
-            stageID: notionPageID,
+            stageID: stageID,
             status: newStatus,
             createdAt: Date(),
             retryCount: 0
@@ -168,7 +168,7 @@ final class StageStore: ObservableObject {
 
   func setTodoStatus(todoID: String, status: TodoStatus) {
     guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
-    guard todos[index].automationTag.hasPrefix("notion:") else { return }
+    let todo = todos[index]
     todos[index].status = status
     persist(
       immediateDatabase: true,
@@ -178,6 +178,161 @@ final class StageStore: ObservableObject {
       preferDeltaWrite: true,
       upsertedTodos: [todos[index]]
     )
+    Task { [weak self] in
+      guard let self else { return }
+      guard let configStore = self.configStore, configStore.config.hasNotionCredentials else { return }
+      guard todo.automationTag.hasPrefix("notion:") else { return }
+      let notionPageID = todo.automationTag.replacingOccurrences(of: "notion:", with: "")
+      do {
+        try await self.notionClient.updateTodoStatus(pageID: notionPageID, status: status, config: configStore.config)
+        self.diagnostics?.log(
+          category: "notion",
+          message: "Todo status updated.",
+          metadata: ["todoID": todoID, "notionPageID": notionPageID]
+        )
+      } catch {
+        self.diagnostics?.log(
+          severity: .warning,
+          category: "notion-queue",
+          message: "Todo status update failed.",
+          metadata: ["todoID": todoID, "error": error.localizedDescription]
+        )
+      }
+    }
+  }
+
+  func updateTodo(
+    todoID: String,
+    title: String,
+    dueDate: Date,
+    notes: String,
+    relatedStageID: String,
+    status: TodoStatus
+  ) async {
+    guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
+    guard let configStore else { return }
+
+    todos[index].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    todos[index].dueDate = dueDate
+    todos[index].notes = notes
+    todos[index].relatedStageID = relatedStageID
+    todos[index].status = status
+    todos[index].automationTag = todos[index].automationTag.isEmpty ? "local:\(todoID)" : todos[index].automationTag
+    persist(
+      immediateDatabase: true,
+      stageChanged: false,
+      todoChanged: true,
+      metricsChanged: false,
+      preferDeltaWrite: true,
+      upsertedTodos: [todos[index]]
+    )
+
+    guard configStore.config.hasNotionCredentials else { return }
+    guard todos[index].automationTag.hasPrefix("notion:") else { return }
+    let notionPageID = todos[index].automationTag.replacingOccurrences(of: "notion:", with: "")
+    let relatedStagePageID = resolvedStagePageID(for: todos[index].relatedStageID)
+    do {
+      let updatedTodo = todos[index]
+      _ = try await notionClient.updateTodo(
+        updatedTodo,
+        config: configStore.config,
+        knownPageID: notionPageID,
+        relatedStagePageID: relatedStagePageID
+      )
+      diagnostics?.log(
+        category: "notion",
+        message: "Todo updated.",
+        metadata: ["todoID": todoID, "notionPageID": notionPageID]
+      )
+    } catch {
+      diagnostics?.log(
+        severity: .warning,
+        category: "notion-queue",
+        message: "Todo update failed.",
+        metadata: ["todoID": todoID, "error": error.localizedDescription]
+      )
+    }
+  }
+
+  func createTodo(
+    title: String,
+    dueDate: Date,
+    notes: String,
+    relatedStageID: String,
+    status: TodoStatus
+  ) async {
+    guard let configStore else { return }
+    let todoID = UUID().uuidString
+    let newTodo = TodoItem(
+      id: todoID,
+      title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+      dueDate: dueDate,
+      status: status,
+      notes: notes,
+      relatedStageID: relatedStageID,
+      automationTag: "local:\(todoID)",
+      createdAt: Date()
+    )
+    todos.insert(newTodo, at: 0)
+    persist(
+      immediateDatabase: true,
+      stageChanged: false,
+      todoChanged: true,
+      metricsChanged: false,
+      preferDeltaWrite: true,
+      upsertedTodos: [newTodo]
+    )
+
+    guard configStore.config.hasNotionCredentials, !configStore.config.notionTodoDbId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    do {
+      let notionPageID = try await notionClient.updateTodo(
+        newTodo,
+        config: configStore.config,
+        knownPageID: nil,
+        relatedStagePageID: resolvedStagePageID(for: relatedStageID)
+      )
+      if let index = todos.firstIndex(where: { $0.id == todoID }) {
+        todos[index].automationTag = "notion:\(notionPageID)"
+        persist(
+          immediateDatabase: true,
+          stageChanged: false,
+          todoChanged: true,
+          metricsChanged: false,
+          preferDeltaWrite: true,
+          upsertedTodos: [todos[index]]
+        )
+      }
+      diagnostics?.log(
+        category: "notion",
+        message: "Todo created.",
+        metadata: ["todoID": todoID, "notionPageID": notionPageID]
+      )
+    } catch {
+      diagnostics?.log(
+        severity: .warning,
+        category: "notion-queue",
+        message: "Todo creation failed.",
+        metadata: ["todoID": todoID, "error": error.localizedDescription]
+      )
+    }
+  }
+
+  func deleteTodo(todoID: String) {
+    guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
+    let deleted = todos.remove(at: index)
+    persist(
+      immediateDatabase: true,
+      stageChanged: false,
+      todoChanged: true,
+      metricsChanged: false,
+      preferDeltaWrite: true,
+      deletedTodoIDs: Set([deleted.id])
+    )
+  }
+
+  private func resolvedStagePageID(for stageID: String) -> String? {
+    guard let stage = stages.first(where: { $0.id == stageID }) else { return nil }
+    return notionPageID(for: stage)
   }
 
   func syncFromNotion() async {
@@ -363,7 +518,19 @@ final class StageStore: ObservableObject {
           updateNotionPageID(for: stage.id, notionPageID: notionPageID)
         case .updateStatus:
           guard let stageID = operation.stageID, let status = operation.status else { continue }
-          try await notionClient.updateStageStatus(pageID: stageID, status: status, config: configStore.config)
+          if let notionPageID = resolvedNotionPageID(for: stageID) {
+            try await notionClient.updateStageStatus(pageID: notionPageID, status: status, config: configStore.config)
+          } else if let stage = stages.first(where: { $0.id == stageID }) {
+            let notionPageID = try await notionClient.upsertStage(
+              stage,
+              config: configStore.config,
+              knownPageID: notionPageID(for: stage)
+            )
+            updateNotionPageID(for: stage.id, notionPageID: notionPageID)
+            try await notionClient.updateStageStatus(pageID: notionPageID, status: status, config: configStore.config)
+          } else {
+            continue
+          }
         }
       } catch {
         var next = operation
@@ -816,6 +983,13 @@ final class StageStore: ObservableObject {
       return stage.id
     }
     return nil
+  }
+
+  private func resolvedNotionPageID(for stageID: String) -> String? {
+    if let stage = stages.first(where: { $0.id == stageID }) {
+      return notionPageID(for: stage) ?? (isLikelyNotionPageID(stage.id) ? stage.id : nil)
+    }
+    return isLikelyNotionPageID(stageID) ? stageID : nil
   }
 
   private var shouldUseIncrementalLaunchSync: Bool {

@@ -1,9 +1,17 @@
 .DS_Store
+.AppleDouble
+.LSOverride
 .tools/
 .build/
 build/
 DerivedData/
 NotionDashboard.dmg
+*.ipa
+*.dSYM
+*.xcarchive
 *.xcuserstate
+.swiftpm/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+NotionDashboardSwift.xcodeproj/project.xcworkspace/xcuserdata/
+NotionDashboardSwift.xcodeproj/xcuserdata/

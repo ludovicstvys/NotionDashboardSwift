@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
-import AuthenticationServices
 import CryptoKit
+import Network
 
 #if os(iOS)
 import UIKit
@@ -12,28 +12,63 @@ import AppKit
 enum GoogleAuthError: LocalizedError {
   case missingConfiguration
   case unableToBuildURL
-  case sessionStartFailed
   case callbackMissing
   case callbackMissingCode
+  case listenerFailed(String)
+  case listenerTimedOut
+  case stateMismatch
   case tokenExchangeFailed(String)
   case refreshTokenMissing
 
   var errorDescription: String? {
     switch self {
     case .missingConfiguration:
-      return "Google OAuth client ID/redirect URI is missing."
+      return "Google OAuth client ID or client secret is missing."
     case .unableToBuildURL:
       return "Unable to build Google OAuth URL."
-    case .sessionStartFailed:
-      return "Unable to start Google OAuth session."
     case .callbackMissing:
       return "Google OAuth callback URL missing."
     case .callbackMissingCode:
       return "Google OAuth callback does not contain code."
+    case let .listenerFailed(message):
+      return "Google OAuth listener failed: \(message)"
+    case .listenerTimedOut:
+      return "Google OAuth listener timed out."
+    case .stateMismatch:
+      return "Google OAuth callback state did not match the request."
     case let .tokenExchangeFailed(message):
       return "Google token exchange failed: \(message)"
     case .refreshTokenMissing:
       return "Google refresh token is missing."
+    }
+  }
+}
+
+enum GoogleConnectionState: Equatable {
+  case notConfigured
+  case disconnected
+  case connecting
+  case connected(tokenExpiresAt: Date?)
+  case error(String)
+
+  var isConnected: Bool {
+    if case .connected = self { return true }
+    return false
+  }
+
+  var label: String {
+    switch self {
+    case .notConfigured:
+      return "Not configured"
+    case .disconnected:
+      return "Not connected"
+    case .connecting:
+      return "Connecting..."
+    case let .connected(tokenExpiresAt):
+      guard let tokenExpiresAt else { return "Google connected" }
+      return "Google connected until \(tokenExpiresAt.shortDateTime)"
+    case let .error(message):
+      return message
     }
   }
 }
@@ -59,10 +94,10 @@ final class GoogleAuthStore: NSObject, ObservableObject {
   @Published private(set) var isAuthenticated: Bool = false
   @Published private(set) var statusMessage: String = "Not connected"
   @Published private(set) var activeScopes: [String] = []
+  @Published private(set) var connectionState: GoogleConnectionState = .disconnected
 
   private weak var configStore: ConfigStore?
   private weak var diagnostics: DiagnosticsStore?
-  private var authSession: ASWebAuthenticationSession?
 
   init(configStore: ConfigStore, diagnostics: DiagnosticsStore?) {
     self.configStore = configStore
@@ -73,14 +108,26 @@ final class GoogleAuthStore: NSObject, ObservableObject {
 
   func refreshAuthState() {
     guard let configStore else { return }
-    let token = configStore.config.googleAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
-    let expiry = configStore.config.googleTokenExpiration ?? .distantPast
-    isAuthenticated = !token.isEmpty && expiry > Date().addingTimeInterval(30)
-    if isAuthenticated {
-      statusMessage = "Google connected."
-    } else {
-      statusMessage = "Not connected"
+    let clientID = configStore.config.googleOAuthClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clientID.isEmpty else {
+      isAuthenticated = false
+      connectionState = .notConfigured
+      statusMessage = connectionState.label
+      activeScopes = configStore.config.googleOAuthScopes
+      return
     }
+
+    let token = configStore.config.googleAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let refreshToken = configStore.config.googleRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let expiry = configStore.config.googleTokenExpiration ?? .distantPast
+    isAuthenticated = (!token.isEmpty && expiry > Date().addingTimeInterval(30)) || !refreshToken.isEmpty
+    if isAuthenticated {
+      let visibleExpiry = expiry > Date().addingTimeInterval(30) ? expiry : nil
+      connectionState = .connected(tokenExpiresAt: visibleExpiry)
+    } else {
+      connectionState = .disconnected
+    }
+    statusMessage = connectionState.label
     activeScopes = configStore.config.googleOAuthScopes
   }
 
@@ -95,12 +142,16 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     diagnostics?.log(category: "google-auth", message: "Google signed out.")
   }
 
-  func signInInteractive() async {
+  func signInInteractive() async -> Bool {
+    connectionState = .connecting
+    statusMessage = connectionState.label
     do {
       try await startOAuthFlow()
       refreshAuthState()
       diagnostics?.log(category: "google-auth", message: "Google OAuth completed.")
+      return true
     } catch {
+      connectionState = .error(error.localizedDescription)
       statusMessage = error.localizedDescription
       diagnostics?.log(
         severity: .error,
@@ -108,6 +159,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
         message: "Google OAuth failed.",
         metadata: ["error": error.localizedDescription]
       )
+      return false
     }
   }
 
@@ -123,6 +175,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     guard !refresh.isEmpty else { throw GoogleAuthError.refreshTokenMissing }
     let token = try await refreshToken(
       clientID: configStore.config.googleOAuthClientID,
+      clientSecret: configStore.config.googleOAuthClientSecret,
       refreshToken: refresh
     )
     configStore.update { config in
@@ -136,11 +189,19 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     return token.accessToken
   }
 
+  var connectionSummary: String {
+    connectionState.label
+  }
+
+  var hasConfiguredOAuth: Bool {
+    connectionState != .notConfigured
+  }
+
   private func startOAuthFlow() async throws {
     guard let configStore else { throw GoogleAuthError.missingConfiguration }
     let clientID = configStore.config.googleOAuthClientID.trimmingCharacters(in: .whitespacesAndNewlines)
-    let redirectURI = configStore.config.googleOAuthRedirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !clientID.isEmpty, !redirectURI.isEmpty else {
+    let clientSecret = configStore.config.googleOAuthClientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clientID.isEmpty, !clientSecret.isEmpty else {
       throw GoogleAuthError.missingConfiguration
     }
 
@@ -152,9 +213,9 @@ final class GoogleAuthStore: NSObject, ObservableObject {
 
     let codeVerifier = randomCodeVerifier()
     let codeChallenge = codeVerifier.codeChallengeS256
-    guard let callbackScheme = URL(string: redirectURI)?.scheme else {
-      throw GoogleAuthError.missingConfiguration
-    }
+    let state = randomCodeVerifier()
+    let listener = try makeLoopbackListener()
+    let redirectURI = listener.redirectURI.absoluteString
 
     var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")
     components?.queryItems = [
@@ -164,36 +225,26 @@ final class GoogleAuthStore: NSObject, ObservableObject {
       .init(name: "scope", value: scopeParam),
       .init(name: "access_type", value: "offline"),
       .init(name: "prompt", value: "consent"),
+      .init(name: "include_granted_scopes", value: "true"),
       .init(name: "code_challenge", value: codeChallenge),
       .init(name: "code_challenge_method", value: "S256"),
+      .init(name: "state", value: state),
     ]
     guard let authURL = components?.url else {
       throw GoogleAuthError.unableToBuildURL
     }
 
-    let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
-      let session = ASWebAuthenticationSession(
-        url: authURL,
-        callbackURLScheme: callbackScheme
-      ) { callbackURL, error in
-        if let error {
-          continuation.resume(throwing: error)
-          return
-        }
-        guard let callbackURL else {
-          continuation.resume(throwing: GoogleAuthError.callbackMissing)
-          return
-        }
-        continuation.resume(returning: callbackURL)
-      }
-      session.prefersEphemeralWebBrowserSession = true
-      session.presentationContextProvider = self
-      self.authSession = session
-      guard session.start() else {
-        continuation.resume(throwing: GoogleAuthError.sessionStartFailed)
-        return
-      }
+    let callbackTask = Task {
+      try await listener.waitForCallback(timeout: 180)
     }
+
+    #if os(macOS)
+    NSWorkspace.shared.open(authURL)
+    #else
+    await UIApplication.shared.open(authURL)
+    #endif
+
+    let callbackURL = try await callbackTask.value
 
     guard
       let parts = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
@@ -202,9 +253,13 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     else {
       throw GoogleAuthError.callbackMissingCode
     }
+    guard parts.queryItems?.first(where: { $0.name == "state" })?.value == state else {
+      throw GoogleAuthError.stateMismatch
+    }
 
     let token = try await exchangeCodeForToken(
       clientID: clientID,
+      clientSecret: clientSecret,
       code: code,
       redirectURI: redirectURI,
       codeVerifier: codeVerifier
@@ -222,6 +277,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
 
   private func exchangeCodeForToken(
     clientID: String,
+    clientSecret: String,
     code: String,
     redirectURI: String,
     codeVerifier: String
@@ -232,6 +288,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     let params = [
       "code": code,
       "client_id": clientID,
+      "client_secret": clientSecret,
       "redirect_uri": redirectURI,
       "grant_type": "authorization_code",
       "code_verifier": codeVerifier,
@@ -260,14 +317,16 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     }
   }
 
-  private func refreshToken(clientID: String, refreshToken: String) async throws -> GoogleTokenResponse {
+  private func refreshToken(clientID: String, clientSecret: String, refreshToken: String) async throws -> GoogleTokenResponse {
     let cleanClientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !cleanClientID.isEmpty else { throw GoogleAuthError.missingConfiguration }
+    let cleanClientSecret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !cleanClientID.isEmpty, !cleanClientSecret.isEmpty else { throw GoogleAuthError.missingConfiguration }
     var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
     request.httpMethod = "POST"
     request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     let params = [
       "client_id": cleanClientID,
+      "client_secret": cleanClientSecret,
       "refresh_token": refreshToken,
       "grant_type": "refresh_token",
     ]
@@ -298,31 +357,17 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     let data = Data((0..<64).map { _ in UInt8.random(in: 0...255) })
     return data.base64URLEncodedString
   }
-}
 
-extension GoogleAuthStore: ASWebAuthenticationPresentationContextProviding {
-  nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-    MainActor.assumeIsolated {
-#if os(iOS)
-      let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-      let keyWindow = scenes.flatMap(\.windows).first { $0.isKeyWindow }
-      return keyWindow ?? ASPresentationAnchor(frame: .zero)
-#elseif os(macOS)
-      return NSApplication.shared.windows.first { $0.isKeyWindow } ??
-        ASPresentationAnchor(
-          contentRect: .init(x: 0, y: 0, width: 1, height: 1),
-          styleMask: [.titled],
-          backing: .buffered,
-          defer: false
-        )
-#endif
-    }
+  private func makeLoopbackListener() throws -> LoopbackOAuthListener {
+    try LoopbackOAuthListener()
   }
 }
 
 private extension String {
   var urlQueryEncoded: String {
-    addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? self
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-._~")
+    return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
   }
 
   var codeChallengeS256: String {
@@ -337,5 +382,164 @@ private extension Data {
       .replacingOccurrences(of: "+", with: "-")
       .replacingOccurrences(of: "/", with: "_")
       .replacingOccurrences(of: "=", with: "")
+  }
+}
+
+private final class LoopbackOAuthListener {
+  let redirectURI: URL
+  private let listener: NWListener
+  private var callbackContinuation: CheckedContinuation<URL, Error>?
+  private var pendingCallbackResult: Result<URL, Error>?
+  private var didFinish = false
+
+  init() throws {
+    let port = Self.pickPort()
+    guard let redirectURI = URL(string: "http://127.0.0.1:\(port)/oauth2redirect") else {
+      throw GoogleAuthError.missingConfiguration
+    }
+    self.redirectURI = redirectURI
+
+    let params = NWParameters.tcp
+    params.allowLocalEndpointReuse = true
+    do {
+      listener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: NWEndpoint.Port.IntegerLiteralType(port)))
+    } catch {
+      throw GoogleAuthError.listenerFailed(error.localizedDescription)
+    }
+
+    listener.newConnectionHandler = { [weak self] connection in
+      self?.handle(connection: connection)
+    }
+    listener.stateUpdateHandler = { [weak self] state in
+      switch state {
+      case .failed(let error):
+        self?.finish(throwing: GoogleAuthError.listenerFailed(error.localizedDescription))
+      default:
+        break
+      }
+    }
+    listener.start(queue: .main)
+  }
+
+  func waitForCallback(timeout: TimeInterval) async throws -> URL {
+    try await withCheckedThrowingContinuation { continuation in
+      DispatchQueue.main.async { [weak self] in
+        guard let self else {
+          continuation.resume(throwing: GoogleAuthError.listenerFailed("Listener deallocated."))
+          return
+        }
+
+        if let result = self.pendingCallbackResult {
+          self.pendingCallbackResult = nil
+          continuation.resume(with: result)
+          return
+        }
+
+        if self.didFinish {
+          continuation.resume(throwing: GoogleAuthError.listenerFailed("Callback already completed."))
+          return
+        }
+
+        self.callbackContinuation = continuation
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+          self?.finish(throwing: GoogleAuthError.listenerTimedOut)
+        }
+      }
+    }
+  }
+
+  private func handle(connection: NWConnection) {
+    connection.start(queue: .main)
+    connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, isComplete, error in
+      guard let self else { return }
+      if let error {
+        self.finish(throwing: GoogleAuthError.listenerFailed(error.localizedDescription))
+        connection.cancel()
+        return
+      }
+
+      let requestText = String(data: data ?? Data(), encoding: .utf8) ?? ""
+      guard let firstLine = requestText.split(separator: "\r\n").first else {
+        self.finish(throwing: GoogleAuthError.callbackMissing)
+        connection.cancel()
+        return
+      }
+
+      let parts = firstLine.split(separator: " ")
+      guard parts.count >= 2 else {
+        self.finish(throwing: GoogleAuthError.callbackMissing)
+        connection.cancel()
+        return
+      }
+
+      let path = String(parts[1])
+      let callbackURL = URL(string: path, relativeTo: self.redirectURI)?.absoluteURL ?? self.redirectURI
+      self.respond(connection: connection, body: self.htmlResponse) { [weak self] sendError in
+        guard let self else {
+          connection.cancel()
+          return
+        }
+        if let sendError {
+          self.finish(throwing: GoogleAuthError.listenerFailed(sendError.localizedDescription))
+        } else {
+          self.finish(returning: callbackURL)
+        }
+        connection.cancel()
+      }
+
+      if isComplete {
+        return
+      }
+    }
+  }
+
+  private func respond(connection: NWConnection, body: String, completion: @escaping (NWError?) -> Void) {
+    let response = [
+      "HTTP/1.1 200 OK",
+      "Content-Type: text/html; charset=utf-8",
+      "Content-Length: \(body.utf8.count)",
+      "Connection: close",
+      "",
+      body,
+    ].joined(separator: "\r\n")
+    let data = response.data(using: .utf8) ?? Data()
+    connection.send(content: data, isComplete: true, completion: .contentProcessed(completion))
+  }
+
+  private func finish(returning url: URL) {
+    finish(with: .success(url))
+  }
+
+  private func finish(throwing error: Error) {
+    finish(with: .failure(error))
+  }
+
+  private func finish(with result: Result<URL, Error>) {
+    guard !didFinish else { return }
+    didFinish = true
+    listener.cancel()
+
+    guard let continuation = callbackContinuation else {
+      pendingCallbackResult = result
+      return
+    }
+
+    callbackContinuation = nil
+    continuation.resume(with: result)
+  }
+
+  private var htmlResponse: String {
+    """
+    <!doctype html>
+    <html><head><meta charset="utf-8"><title>Dashboard sign-in</title></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 32px;">
+    <h2>Google sign-in complete</h2>
+    <p>You can close this tab and return to the app.</p>
+    </body></html>
+    """
+  }
+
+  private static func pickPort() -> Int {
+    Int.random(in: 49152...65535)
   }
 }

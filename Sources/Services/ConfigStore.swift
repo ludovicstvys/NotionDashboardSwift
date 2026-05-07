@@ -44,13 +44,13 @@ final class ConfigStore: ObservableObject {
     decoder.dateDecodingStrategy = .iso8601
     self.decoder = decoder
 
-    if
-      let data = defaults.data(forKey: storageKey),
-      let loaded = try? decoder.decode(AppConfig.self, from: data)
-    {
-      self.config = loaded
-    } else {
-      self.config = .defaults
+    let stored = Self.loadConfig(from: defaults.data(forKey: storageKey), decoder: decoder)
+    let legacy = Self.loadConfig(from: LegacyPreferences.data(forKey: storageKey), decoder: decoder)
+    let selected = Self.preferredConfig(current: stored, legacy: legacy)
+    let migrated = Self.migratedGoogleOAuthConfig(selected)
+    self.config = migrated
+    if migrated != stored {
+      persist()
     }
   }
 
@@ -65,7 +65,7 @@ final class ConfigStore: ObservableObject {
       let data = defaults.data(forKey: storageKey),
       let loaded = try? decoder.decode(AppConfig.self, from: data)
     {
-      config = loaded
+      config = Self.migratedGoogleOAuthConfig(loaded)
     }
   }
 
@@ -89,14 +89,63 @@ final class ConfigStore: ObservableObject {
     guard let data = clean.data(using: .utf8) else { throw ConfigStoreError.invalidText }
 
     if let snapshot = try? decoder.decode(ConnectionsSnapshot.self, from: data) {
-      config = snapshot.config
+      config = Self.migratedGoogleOAuthConfig(snapshot.config)
       return
     }
     if let direct = try? decoder.decode(AppConfig.self, from: data) {
-      config = direct
+      config = Self.migratedGoogleOAuthConfig(direct)
       return
     }
     throw ConfigStoreError.invalidSnapshot
+  }
+
+  private static func migratedGoogleOAuthConfig(_ source: AppConfig) -> AppConfig {
+    var config = source
+    let defaultScopes = AppConfig.defaults.googleOAuthScopes
+    if config.googleOAuthScopes.isEmpty {
+      config.googleOAuthScopes = defaultScopes
+    }
+
+    let storedClientID = config.googleOAuthClientID.trimmingCharacters(in: .whitespacesAndNewlines)
+    let storedClientSecret = config.googleOAuthClientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+    let storedRedirectURI = config.googleOAuthRedirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
+    let shouldResetOAuthSession = storedClientID != AppConfig.defaultGoogleOAuthClientID ||
+      storedClientSecret != AppConfig.defaultGoogleOAuthClientSecret ||
+      !storedRedirectURI.isEmpty
+
+    if shouldResetOAuthSession {
+      config.googleOAuthClientID = AppConfig.defaultGoogleOAuthClientID
+      config.googleOAuthClientSecret = AppConfig.defaultGoogleOAuthClientSecret
+      config.googleOAuthRedirectURI = ""
+      config.googleAccessToken = ""
+      config.googleRefreshToken = ""
+      config.googleTokenExpiration = nil
+    }
+
+    return config
+  }
+
+  private static func loadConfig(from data: Data?, decoder: JSONDecoder) -> AppConfig? {
+    guard let data else { return nil }
+    return try? decoder.decode(AppConfig.self, from: data)
+  }
+
+  private static func preferredConfig(current: AppConfig?, legacy: AppConfig?) -> AppConfig {
+    guard let legacy else { return current ?? .defaults }
+    guard let current else { return legacy }
+    return connectionScore(legacy) > connectionScore(current) ? legacy : current
+  }
+
+  private static func connectionScore(_ config: AppConfig) -> Int {
+    var score = 0
+    if config.hasNotionCredentials { score += 4 }
+    if !config.notionTodoDbId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 1 }
+    if !config.googleRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 3 }
+    if !config.googleAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 1 }
+    if !config.googleSelectedCalendarIDs.isEmpty { score += 2 }
+    if !config.externalIcalUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 2 }
+    if config.focusModeEnabled { score += 1 }
+    return score
   }
 
   private func persist() {
