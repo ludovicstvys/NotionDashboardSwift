@@ -13,8 +13,12 @@ struct RootView: View {
       NavigationSplitView {
         sidebar
       } detail: {
-        detailContainer
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+          detailContainer
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.opacity.combined(with: .scale(scale: 0.995)))
+        }
+        .animation(.snappy(duration: 0.24), value: appRouter.destination)
       }
       .tint(.teal)
 #else
@@ -104,7 +108,7 @@ struct RootView: View {
           .scaledToFit()
           .frame(width: 42, height: 42)
           .padding(6)
-          .background(WorkspacePalette.innerCard)
+          .background(WorkspacePalette.innerCardStrong)
           .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
           .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -115,10 +119,23 @@ struct RootView: View {
           Text("NotionDashboard")
             .font(.system(size: 19, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
-          Text("Student workspace")
+          Text("Premium daily operating system")
             .font(.caption.weight(.semibold))
             .foregroundStyle(WorkspacePalette.subtleText)
         }
+      }
+
+      HStack(spacing: 10) {
+        WorkspaceStatusPill(
+          title: "Live",
+          value: appRouter.destination.title,
+          tint: appRouter.destination.tint
+        )
+        WorkspaceStatusPill(
+          title: "Today",
+          value: Date.now.formatted(.dateTime.month(.abbreviated).day()),
+          tint: WorkspacePalette.accent
+        )
       }
 
     }
@@ -136,7 +153,7 @@ struct RootView: View {
 
   private var navigationBlock: some View {
     VStack(alignment: .leading, spacing: 10) {
-      sidebarSectionTitle("Navigate")
+      sidebarSectionTitle("Workspace")
       VStack(spacing: 8) {
         ForEach(RootDestination.allCases) { destination in
           sidebarButton(for: destination)
@@ -188,12 +205,23 @@ struct RootView: View {
   private func sidebarButton(for destination: RootDestination) -> some View {
     let isSelected = appRouter.destination == destination
     return Button {
-      appRouter.select(destination)
+      withAnimation(.snappy(duration: 0.24)) {
+        appRouter.select(destination)
+      }
     } label: {
       HStack(spacing: 12) {
         ZStack {
           RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(isSelected ? destination.tint.opacity(0.18) : WorkspacePalette.innerCard)
+            .fill(
+              LinearGradient(
+                colors: [
+                  isSelected ? destination.tint.opacity(0.22) : WorkspacePalette.innerCardStrong,
+                  isSelected ? destination.tint.opacity(0.08) : WorkspacePalette.innerCard
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            )
           Image(systemName: destination.systemImage)
             .font(.system(size: 15, weight: .bold))
             .foregroundStyle(isSelected ? destination.tint : Color.white.opacity(0.68))
@@ -219,7 +247,7 @@ struct RootView: View {
       .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
       .background(
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-          .fill(isSelected ? WorkspacePalette.panelRaised.opacity(0.96) : Color.white.opacity(0.001))
+          .fill(isSelected ? WorkspacePalette.panelRaised.opacity(0.98) : Color.white.opacity(0.001))
       )
       .overlay(alignment: .leading) {
         if isSelected {
@@ -233,8 +261,11 @@ struct RootView: View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
           .stroke(isSelected ? destination.tint.opacity(0.26) : Color.clear, lineWidth: 1)
       }
+      .shadow(color: isSelected ? destination.tint.opacity(0.10) : .clear, radius: 12, x: 0, y: 6)
     }
     .buttonStyle(.plain)
+    .animation(.snappy(duration: 0.22), value: isSelected)
+    .workspaceReveal(distance: 10)
   }
 
   @ViewBuilder
@@ -289,7 +320,7 @@ struct RootView: View {
         .clipShape(Capsule())
     }
     .padding(12)
-    .background(WorkspacePalette.innerCard)
+    .background(WorkspacePalette.innerCardStrong)
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 16, style: .continuous)

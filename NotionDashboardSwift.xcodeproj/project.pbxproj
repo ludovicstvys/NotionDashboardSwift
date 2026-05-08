@@ -57,6 +57,8 @@
 		8A3AAAB0CA7E67AF170E713D /* FocusMenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F4CFC462F7D9612221B596D /* FocusMenuBarPanel.swift */; };
 		8A55281439CD0E4586097E6B /* CalendarRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CE75F05FCC4AF6A4276877 /* CalendarRepository.swift */; };
 		8BF0C2B753ED0B89CF1B4919 /* StageStoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8F6DC2DAD9BEA8AD886B45 /* StageStoreCache.swift */; };
+		8C8E245E41CF66ACC9F2A315 /* EnvironmentSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F051695C82DCDA4DAF83AD9 /* EnvironmentSecrets.swift */; };
+		8D1D7A316F42A8EA709895BC /* EnvironmentSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F051695C82DCDA4DAF83AD9 /* EnvironmentSecrets.swift */; };
 		8F868E07DFDD3CA0961F6861 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA83AD7B8DF427ED7D066D8 /* WidgetData.swift */; };
 		96C518ECF002062ACBCB96D5 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38EB7F726AAF40B97960266 /* DashboardView.swift */; };
 		993269764CEB5464CB005921 /* UpdateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0CE65E51C36F68CFF550A46 /* UpdateStore.swift */; };
@@ -171,6 +173,7 @@
 		8A4511B6A4104663D97F71B4 /* PipelineImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineImportService.swift; sourceTree = "<group>"; };
 		977815719EB7CFA795B63BC6 /* ProtectedLinkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectedLinkButton.swift; sourceTree = "<group>"; };
 		97B57DEE06707D14A660DA8B /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		9F051695C82DCDA4DAF83AD9 /* EnvironmentSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentSecrets.swift; sourceTree = "<group>"; };
 		A802A0B5FDE842FF9FDD5877 /* NotionDashboard-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "NotionDashboard-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9DC7A9E4266D0A75C99A37C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B3239F0AD2A525011A89B9A9 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
@@ -310,6 +313,7 @@
 				3AAD8EF815DF2E5A01538D50 /* CalendarStore.swift */,
 				B66D0E6AEBC864380411BA87 /* ConfigStore.swift */,
 				79EA1D57C85801CD38176ADB /* DiagnosticsStore.swift */,
+				9F051695C82DCDA4DAF83AD9 /* EnvironmentSecrets.swift */,
 				D7928C5CE2CCD36C5C51A03B /* FocusLocalServer.swift */,
 				BF22913667630F6A1D5066C2 /* FocusStore.swift */,
 				11C34DD89BE1E529EF6A1D41 /* GoogleAuthStore.swift */,
@@ -505,6 +509,7 @@
 				96C518ECF002062ACBCB96D5 /* DashboardView.swift in Sources */,
 				EBCE5E49088104F5AFF653F8 /* Date+Helpers.swift in Sources */,
 				60C681ABE3B9A88C9CCC9526 /* DiagnosticsStore.swift in Sources */,
+				8D1D7A316F42A8EA709895BC /* EnvironmentSecrets.swift in Sources */,
 				5A0879BE3D70B83EDB8F964C /* FocusLocalServer.swift in Sources */,
 				8A3AAAB0CA7E67AF170E713D /* FocusMenuBarPanel.swift in Sources */,
 				ED3A0C7249641437247532A3 /* FocusStore.swift in Sources */,
@@ -562,6 +567,7 @@
 				A9246007F042EF1E8C5FAF0C /* DashboardView.swift in Sources */,
 				7F3EB794921EC5E4421956FB /* Date+Helpers.swift in Sources */,
 				D16CB868781D68AF8EB00B92 /* DiagnosticsStore.swift in Sources */,
+				8C8E245E41CF66ACC9F2A315 /* EnvironmentSecrets.swift in Sources */,
 				B2D8CACF1C9E76E6082654A0 /* FocusLocalServer.swift in Sources */,
 				EBE66C63AFE5C9331243CB11 /* FocusMenuBarPanel.swift in Sources */,
 				76B2B4CF8BCA3D68FC9EC7AF /* FocusStore.swift in Sources */,

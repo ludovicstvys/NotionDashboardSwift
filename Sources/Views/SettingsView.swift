@@ -6,6 +6,8 @@ private struct SettingsTextDrafts: Equatable {
   var notionDbId: String = ""
   var notionTodoDbId: String = ""
   var bdfApiKey: String = ""
+  var googleOAuthClientID: String = ""
+  var googleOAuthClientSecret: String = ""
   var googlePlacesApiKey: String = ""
   var externalIcalUrl: String = ""
   var defaultReminders: String = ""
@@ -31,6 +33,8 @@ private struct SettingsTextDrafts: Equatable {
       notionDbId: config.notionDbId,
       notionTodoDbId: config.notionTodoDbId,
       bdfApiKey: config.bdfApiKey,
+      googleOAuthClientID: config.googleOAuthClientID,
+      googleOAuthClientSecret: config.googleOAuthClientSecret,
       googlePlacesApiKey: config.googlePlacesApiKey,
       externalIcalUrl: config.externalIcalUrl,
       defaultReminders: config.reminderPrefs.defaultMinutes.map(String.init).joined(separator: ","),
@@ -96,7 +100,10 @@ struct SettingsView: View {
 
             settingsSection("Calendar and alerts", isExpanded: $showCalendarSettings) {
               settingsRow(sizeClass: metrics.sizeClass) {
-                GoogleCalendarSettingsPanel()
+                GoogleCalendarSettingsPanel(
+                  googleOAuthClientID: textDraftBinding(\.googleOAuthClientID),
+                  googleOAuthClientSecret: textDraftBinding(\.googleOAuthClientSecret)
+                )
               } right: {
                 calendarPanel
               }
@@ -175,17 +182,17 @@ struct SettingsView: View {
       VStack(alignment: .leading, spacing: 22) {
         HStack(alignment: .top, spacing: 20) {
           VStack(alignment: .leading, spacing: 12) {
-            Text("SETTINGS")
+            Text("SYSTEM CONTROL")
               .font(.caption2.weight(.bold))
               .tracking(1.8)
               .foregroundStyle(Color.white.opacity(0.70))
 
-            Text("Control center.\nNo hidden setup.")
+            Text("Connections, sync,\nand runtime health.")
               .font(.system(size: metrics.sizeClass == .wide ? 42 : 34, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
               .fixedSize(horizontal: false, vertical: true)
 
-            Text("Manage credentials, sync, reminders, exports and diagnostics from predictable grouped controls.")
+            Text("Manage credentials, reminders, exports, diagnostics, and app health from one explicit control surface.")
               .font(.subheadline)
               .foregroundStyle(Color.white.opacity(0.72))
               .fixedSize(horizontal: false, vertical: true)
@@ -285,7 +292,7 @@ struct SettingsView: View {
   private var setupHealthPanel: some View {
     WorkspacePanel(
       title: "Setup health",
-      subtitle: "The minimum viable dashboard setup in one readable checklist.",
+      subtitle: "The minimum viable operating setup in one readable checklist.",
       tint: setupHealthTint
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -338,7 +345,7 @@ struct SettingsView: View {
   private var notionPanel: some View {
     WorkspacePanel(
       title: "Notion and pipeline",
-      subtitle: "Credentials, sync controls, offline queue, and external API keys live together.",
+      subtitle: "Credentials, sync controls, offline queue, and enrichment keys stay in one operational group.",
       tint: WorkspacePalette.accentSoft
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -389,7 +396,7 @@ struct SettingsView: View {
   private var calendarPanel: some View {
     WorkspacePanel(
       title: "Calendar and reminders",
-      subtitle: "iCal source, notification authorization, and offsets are grouped by event flow.",
+      subtitle: "iCal source, notification authorization, and offsets are grouped around event flow.",
       tint: WorkspacePalette.warning
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -443,7 +450,7 @@ struct SettingsView: View {
   private var marketPanel: some View {
     WorkspacePanel(
       title: "Markets and news",
-      subtitle: "Signal toggles and ticker universe stay in one panel instead of being buried in a long form.",
+      subtitle: "Signal toggles and ticker coverage stay visible instead of disappearing into a long form.",
       tint: WorkspacePalette.success
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -467,7 +474,7 @@ struct SettingsView: View {
   private var mappingPanel: some View {
     WorkspacePanel(
       title: "Mapping and limits",
-      subtitle: "Notion field names, status values, and WIP limits are grouped as one schema panel.",
+      subtitle: "Field names, status values, and WIP limits form one schema control layer.",
       tint: WorkspacePalette.warning
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -505,7 +512,7 @@ struct SettingsView: View {
   private var importExportPanel: some View {
     WorkspacePanel(
       title: "Import and export",
-      subtitle: "Sensitive connection snapshots can be reviewed, exported, and re-imported from a single transport panel.",
+      subtitle: "Sensitive connection snapshots can be reviewed, exported, and re-imported from one transport layer.",
       tint: WorkspacePalette.accentSoft
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -571,7 +578,7 @@ struct SettingsView: View {
   private var diagnosticsPanel: some View {
     WorkspacePanel(
       title: "Diagnostics",
-      subtitle: "Offline queue visibility and recent logs stay visible without falling back to a raw form list.",
+      subtitle: "Offline queue visibility and recent logs stay visible without falling back to raw utility views.",
       tint: .white
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -692,10 +699,16 @@ struct SettingsView: View {
       }
       .padding(.top, 16)
     } label: {
-      HStack {
-        Text(title)
-          .font(.headline.weight(.semibold))
-          .foregroundStyle(.white)
+      HStack(alignment: .center, spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(title)
+            .font(.system(size: 22, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+          Text(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(Color.white.opacity(0.54))
+            .tracking(0.6)
+        }
         Spacer()
         Text(isExpanded.wrappedValue ? "Hide" : "Show")
           .font(.caption.weight(.bold))
@@ -715,9 +728,19 @@ struct SettingsView: View {
     VStack(alignment: .leading, spacing: 6) {
       panelLabel(title)
       TextField(prompt, text: text)
-        .textFieldStyle(.roundedBorder)
         .plainTextInputBehavior()
         .font(monospaced ? .system(.subheadline, design: .monospaced) : .subheadline)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(WorkspacePalette.innerCardStrong)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
   }
 
@@ -727,7 +750,7 @@ struct SettingsView: View {
 
   private var settingsDivider: some View {
     Rectangle()
-      .fill(Color.white.opacity(0.08))
+      .fill(Color.white.opacity(0.06))
       .frame(height: 1)
   }
 
@@ -748,6 +771,7 @@ struct SettingsView: View {
     Text(text)
       .font(.caption)
       .foregroundStyle(Color.white.opacity(0.80))
+      .lineSpacing(1)
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -963,10 +987,14 @@ struct SettingsView: View {
     let currentConfig = configStore.config
     let nextSymbols = parseCSV(textDrafts.marketSymbols)
     var nextConfig = currentConfig
+    let nextGoogleClientID = normalizedDraftValue(textDrafts.googleOAuthClientID)
+    let nextGoogleClientSecret = normalizedDraftValue(textDrafts.googleOAuthClientSecret)
     nextConfig.notionToken = normalizedDraftValue(textDrafts.notionToken)
     nextConfig.notionDbId = normalizedDraftValue(textDrafts.notionDbId)
     nextConfig.notionTodoDbId = normalizedDraftValue(textDrafts.notionTodoDbId)
     nextConfig.bdfApiKey = normalizedDraftValue(textDrafts.bdfApiKey)
+    nextConfig.googleOAuthClientID = nextGoogleClientID
+    nextConfig.googleOAuthClientSecret = nextGoogleClientSecret
     nextConfig.googlePlacesApiKey = normalizedDraftValue(textDrafts.googlePlacesApiKey)
     nextConfig.externalIcalUrl = normalizedDraftValue(textDrafts.externalIcalUrl)
     nextConfig.reminderPrefs = ReminderPrefs(
@@ -992,9 +1020,23 @@ struct SettingsView: View {
       rejected: normalizedDraftValue(textDrafts.rejectedStatus).ifEmpty("Refuse")
     )
 
+    let googleCredentialsChanged = nextGoogleClientID != currentConfig.googleOAuthClientID ||
+      nextGoogleClientSecret != currentConfig.googleOAuthClientSecret
+    if googleCredentialsChanged {
+      nextConfig.googleAccessToken = ""
+      nextConfig.googleRefreshToken = ""
+      nextConfig.googleTokenExpiration = nil
+      nextConfig.googleSelectedCalendarIDs = []
+      nextConfig.googleDefaultCalendarID = ""
+    }
+
     guard nextConfig != currentConfig else { return }
     configStore.update { config in
       config = nextConfig
+    }
+    if googleCredentialsChanged {
+      calendarStore.selectedCalendarIDs = []
+      googleAuthStore.refreshAuthState()
     }
     syncTextDraftsFromConfig()
   }
@@ -1064,7 +1106,7 @@ private struct SettingsFocusPanel: View {
   var body: some View {
     WorkspacePanel(
       title: "Focus mode",
-      subtitle: "Pomodoro timing and URL blocking now sit in the same guardrail panel.",
+      subtitle: "Pomodoro timing and URL blocking sit together as one guardrail system.",
       tint: .pink
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -1105,8 +1147,18 @@ private struct SettingsFocusPanel: View {
 
         HStack(spacing: 10) {
           TextField("Add blocked rule (ex: youtube.com)", text: $urlRuleInput)
-            .textFieldStyle(.roundedBorder)
             .plainTextInputBehavior()
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background(
+              RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(WorkspacePalette.innerCardStrong)
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
           Button("Add") {
             addURLRule()
           }
@@ -1179,6 +1231,8 @@ struct GoogleCalendarSettingsPanel: View {
   @EnvironmentObject private var configStore: ConfigStore
   @EnvironmentObject private var googleAuthStore: GoogleAuthStore
   @EnvironmentObject private var calendarStore: CalendarStore
+  @Binding var googleOAuthClientID: String
+  @Binding var googleOAuthClientSecret: String
 
   var body: some View {
     WorkspacePanel(
@@ -1187,11 +1241,30 @@ struct GoogleCalendarSettingsPanel: View {
       tint: WorkspacePalette.accent
     ) {
       VStack(alignment: .leading, spacing: 18) {
+        credentialsSection
         actionBar
         summaryRow
         calendarList
         statusSection
       }
+    }
+  }
+
+  private var credentialsSection: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      settingsTextField(
+        "Google OAuth client ID",
+        text: $googleOAuthClientID,
+        prompt: "Desktop app client ID",
+        monospaced: true
+      )
+      settingsTextField(
+        "Google OAuth client secret",
+        text: $googleOAuthClientSecret,
+        prompt: "Desktop app client secret",
+        monospaced: true
+      )
+      panelHint("Use a Google Cloud OAuth client of type Desktop app. The app uses a local loopback callback automatically.")
     }
   }
 
@@ -1208,6 +1281,7 @@ struct GoogleCalendarSettingsPanel: View {
       }
       .buttonStyle(.borderedProminent)
       .tint(WorkspacePalette.accent)
+      .disabled(!configStore.config.hasGoogleOAuthCredentials)
 
       Button("Disconnect") {
         googleAuthStore.signOut()
@@ -1229,6 +1303,33 @@ struct GoogleCalendarSettingsPanel: View {
       }
       .buttonStyle(.bordered)
       .disabled(calendarStore.googleCalendars.isEmpty)
+    }
+  }
+
+  private func settingsTextField(
+    _ title: String,
+    text: Binding<String>,
+    prompt: String,
+    monospaced: Bool = false
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      panelLabel(title)
+      TextField(prompt, text: text)
+        .plainTextInputBehavior()
+        .textContentType(.none)
+        .autocorrectionDisabled()
+        .font(monospaced ? .system(.subheadline, design: .monospaced) : .subheadline)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(WorkspacePalette.innerCardStrong)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
   }
 
@@ -1313,21 +1414,6 @@ struct GoogleCalendarSettingsPanel: View {
       config.googleDefaultCalendarID = primary ?? ""
     }
     calendarStore.selectedCalendarIDs = primary.map { Set([$0]) } ?? []
-  }
-
-  private func settingsTextField(
-    _ title: String,
-    text: Binding<String>,
-    prompt: String,
-    monospaced: Bool = false
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      panelLabel(title)
-      TextField(prompt, text: text)
-        .textFieldStyle(.roundedBorder)
-        .plainTextInputBehavior()
-        .font(monospaced ? .system(.subheadline, design: .monospaced) : .subheadline)
-    }
   }
 
   private func panelLabel(_ text: String) -> some View {

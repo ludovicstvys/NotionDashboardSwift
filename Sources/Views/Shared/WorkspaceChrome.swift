@@ -54,20 +54,22 @@ struct WorkspaceLayoutMetrics {
 }
 
 enum WorkspacePalette {
-  static let backgroundTop = Color(red: 0.035, green: 0.043, blue: 0.055)
-  static let backgroundBottom = Color(red: 0.055, green: 0.067, blue: 0.085)
-  static let panelBase = Color(red: 0.082, green: 0.098, blue: 0.123).opacity(0.985)
-  static let panelRaised = Color(red: 0.112, green: 0.130, blue: 0.160).opacity(0.99)
-  static let innerCard = Color.white.opacity(0.060)
-  static let line = Color.white.opacity(0.095)
-  static let subtleText = Color.white.opacity(0.66)
-  static let secondaryText = Color.white.opacity(0.78)
+  static let backgroundTop = Color(red: 0.020, green: 0.028, blue: 0.042)
+  static let backgroundBottom = Color(red: 0.048, green: 0.060, blue: 0.084)
+  static let panelBase = Color(red: 0.062, green: 0.076, blue: 0.108).opacity(0.988)
+  static let panelRaised = Color(red: 0.090, green: 0.110, blue: 0.146).opacity(0.994)
+  static let innerCard = Color.white.opacity(0.048)
+  static let innerCardStrong = Color.white.opacity(0.078)
+  static let line = Color.white.opacity(0.082)
+  static let lineStrong = Color.white.opacity(0.16)
+  static let subtleText = Color.white.opacity(0.64)
+  static let secondaryText = Color.white.opacity(0.80)
   static let primaryText = Color.white
-  static let accent = Color(red: 0.17, green: 0.64, blue: 0.92)
-  static let accentSoft = Color(red: 0.36, green: 0.82, blue: 0.72)
-  static let success = Color(red: 0.35, green: 0.78, blue: 0.46)
-  static let warning = Color(red: 0.96, green: 0.67, blue: 0.25)
-  static let danger = Color(red: 0.95, green: 0.35, blue: 0.35)
+  static let accent = Color(red: 0.961, green: 0.620, blue: 0.153)
+  static let accentSoft = Color(red: 0.386, green: 0.780, blue: 0.965)
+  static let success = Color(red: 0.373, green: 0.824, blue: 0.600)
+  static let warning = Color(red: 0.639, green: 0.541, blue: 0.957)
+  static let danger = Color(red: 0.93, green: 0.41, blue: 0.38)
 }
 
 enum WorkspaceColor {
@@ -92,7 +94,7 @@ struct WorkspaceBackground: View, Equatable {
         colors: [
           WorkspacePalette.backgroundTop,
           WorkspacePalette.backgroundBottom,
-          Color(red: 0.070, green: 0.078, blue: 0.100),
+          Color(red: 0.062, green: 0.074, blue: 0.098),
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -100,20 +102,28 @@ struct WorkspaceBackground: View, Equatable {
       .ignoresSafeArea()
 
       RadialGradient(
-        colors: [WorkspacePalette.accent.opacity(0.13), .clear],
+        colors: [WorkspacePalette.accent.opacity(0.18), .clear],
         center: .topLeading,
         startRadius: 30,
-        endRadius: 520
+        endRadius: 560
       )
       .offset(x: -140, y: -120)
 
       RadialGradient(
-        colors: [Color.white.opacity(0.045), .clear],
+        colors: [Color.white.opacity(0.055), .clear],
         center: .top,
         startRadius: 30,
-        endRadius: 360
+        endRadius: 420
       )
       .offset(x: 0, y: -220)
+
+      RadialGradient(
+        colors: [WorkspacePalette.warning.opacity(0.11), .clear],
+        center: .trailing,
+        startRadius: 24,
+        endRadius: 380
+      )
+      .offset(x: 60, y: 40)
 
       RadialGradient(
         colors: [WorkspacePalette.accentSoft.opacity(0.08), .clear],
@@ -127,13 +137,13 @@ struct WorkspaceBackground: View, Equatable {
         colors: [
           Color.white.opacity(0.035),
           .clear,
-          Color.white.opacity(0.02),
+          Color.white.opacity(0.018),
         ],
         startPoint: .top,
         endPoint: .bottom
       )
       .blendMode(.softLight)
-      .opacity(0.22)
+      .opacity(0.24)
     }
   }
 }
@@ -165,27 +175,34 @@ struct WorkspacePanel<Content: View>: View {
         HStack(alignment: .top, spacing: 12) {
           VStack(alignment: .leading, spacing: 6) {
             Text(title)
-              .font(.headline.weight(.semibold))
+              .font(.system(size: 20, weight: .semibold, design: .rounded))
               .foregroundStyle(WorkspacePalette.primaryText)
             if let subtitle {
               Text(subtitle)
                 .font(.caption)
                 .foregroundStyle(WorkspacePalette.subtleText)
+                .lineSpacing(1)
                 .fixedSize(horizontal: false, vertical: true)
             }
           }
 
           Spacer(minLength: 0)
 
-          Circle()
-            .fill(tint)
-            .frame(width: 9, height: 9)
-            .shadow(color: tint.opacity(0.38), radius: 8, x: 0, y: 0)
-            .padding(.top, 5)
+          RoundedRectangle(cornerRadius: 999, style: .continuous)
+            .fill(
+              LinearGradient(
+                colors: [tint.opacity(0.95), tint.opacity(0.28)],
+                startPoint: .leading,
+                endPoint: .trailing
+              )
+            )
+            .frame(width: 26, height: 6)
+            .shadow(color: tint.opacity(0.34), radius: 10, x: 0, y: 0)
+            .padding(.top, 7)
         }
 
         Rectangle()
-          .fill(WorkspacePalette.line)
+          .fill(WorkspacePalette.line.opacity(0.72))
           .frame(height: 1)
           .padding(.top, 2)
       }
@@ -195,6 +212,7 @@ struct WorkspacePanel<Content: View>: View {
     .padding(padding)
     .frame(maxWidth: .infinity, alignment: .leading)
     .workspaceInteractiveSurface(cornerRadius: 24, tint: tint)
+    .workspaceReveal()
   }
 }
 
@@ -233,9 +251,22 @@ struct WorkspaceHeroPanel<Content: View>: View {
       .overlay(alignment: .topTrailing) {
         Circle()
           .fill(tint.opacity(0.18))
-          .frame(width: 220, height: 220)
-          .blur(radius: 28)
-          .offset(x: 68, y: -92)
+          .frame(width: 240, height: 240)
+          .blur(radius: 34)
+          .offset(x: 74, y: -100)
+      }
+      .overlay(alignment: .bottomLeading) {
+        RoundedRectangle(cornerRadius: 999, style: .continuous)
+          .fill(
+            LinearGradient(
+              colors: [Color.white.opacity(0.12), .clear],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+          .frame(width: 180, height: 2)
+          .padding(.leading, 2)
+          .padding(.bottom, 2)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -249,6 +280,7 @@ struct WorkspaceHeroPanel<Content: View>: View {
           )
       }
       .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 16)
+      .workspaceReveal(distance: 20)
   }
 }
 
@@ -261,7 +293,7 @@ struct WorkspaceStatusPill: View {
     VStack(alignment: .leading, spacing: 4) {
       Text(title.uppercased())
         .font(.caption2.weight(.bold))
-        .tracking(1.2)
+        .tracking(1.4)
         .foregroundStyle(WorkspacePalette.subtleText)
       HStack(spacing: 7) {
         Circle()
@@ -275,7 +307,7 @@ struct WorkspaceStatusPill: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .background(WorkspacePalette.innerCard)
+    .background(WorkspacePalette.innerCardStrong)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -307,7 +339,7 @@ struct WorkspaceCommandBar<Content: View>: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(title.uppercased())
           .font(.caption2.weight(.bold))
-          .tracking(1.8)
+          .tracking(1.6)
           .foregroundStyle(WorkspacePalette.subtleText)
         Text(subtitle)
           .font(.subheadline)
@@ -328,6 +360,13 @@ struct WorkspaceCommandBar<Content: View>: View {
     .padding(.vertical, 14)
     .frame(maxWidth: .infinity, alignment: .leading)
     .workspaceInteractiveSurface(cornerRadius: 18, tint: tint, raised: false)
+    .overlay(alignment: .topTrailing) {
+      Circle()
+        .fill(tint.opacity(0.16))
+        .frame(width: 76, height: 76)
+        .blur(radius: 18)
+        .offset(x: 22, y: -18)
+    }
   }
 }
 
@@ -344,35 +383,47 @@ struct WorkspaceMetricTile: View {
           .font(.caption.weight(.semibold))
           .foregroundStyle(WorkspacePalette.subtleText)
         Spacer(minLength: 0)
-        Circle()
-          .fill(tint)
-          .frame(width: 8, height: 8)
+        Capsule(style: .continuous)
+          .fill(tint.opacity(0.9))
+          .frame(width: 18, height: 5)
       }
 
       Text(value)
-        .font(.system(size: 28, weight: .semibold, design: .rounded))
+        .font(.system(size: 30, weight: .semibold, design: .rounded))
         .foregroundStyle(WorkspacePalette.primaryText)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
 
       Text(detail)
         .font(.caption)
-        .foregroundStyle(Color.white.opacity(0.60))
+        .foregroundStyle(Color.white.opacity(0.58))
+        .lineSpacing(1)
         .fixedSize(horizontal: false, vertical: true)
     }
     .padding(18)
     .frame(maxWidth: .infinity, minHeight: 122, maxHeight: .infinity, alignment: .leading)
-    .background(WorkspacePalette.innerCard)
+    .background(
+      LinearGradient(
+        colors: [
+          Color.white.opacity(0.092),
+          tint.opacity(0.13),
+          WorkspacePalette.innerCard,
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    )
     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .overlay(alignment: .leading) {
-      RoundedRectangle(cornerRadius: 2)
-        .fill(tint)
-        .frame(width: 3)
-        .padding(.vertical, 18)
-    }
     .overlay {
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .stroke(WorkspacePalette.line, lineWidth: 1)
+    }
+    .overlay(alignment: .bottomTrailing) {
+      Circle()
+        .fill(tint.opacity(0.12))
+        .frame(width: 54, height: 54)
+        .blur(radius: 8)
+        .offset(x: 10, y: 10)
     }
   }
 }
@@ -403,12 +454,13 @@ struct WorkspaceEmptyState: View {
       Text(message)
         .font(.caption)
         .foregroundStyle(WorkspacePalette.subtleText)
+        .lineSpacing(1)
         .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(18)
     .frame(minHeight: 96, alignment: .topLeading)
-    .background(WorkspacePalette.innerCard)
+    .background(WorkspacePalette.innerCardStrong)
     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .overlay {
       RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -426,13 +478,19 @@ struct WorkspaceBadge: View {
       .font(.caption.weight(.bold))
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
-    .background(
-      Capsule(style: .continuous)
-          .fill(tint.opacity(0.13))
+      .background(
+        Capsule(style: .continuous)
+          .fill(
+            LinearGradient(
+              colors: [tint.opacity(0.22), Color.white.opacity(0.08)],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
       )
       .overlay(
         Capsule(style: .continuous)
-          .stroke(tint.opacity(0.18), lineWidth: 1)
+          .stroke(tint.opacity(0.26), lineWidth: 1)
       )
       .foregroundStyle(tint)
   }
@@ -460,7 +518,7 @@ struct FooterMessageHost: View {
           .transition(.move(edge: .bottom).combined(with: .opacity))
       }
     }
-    .animation(.easeOut(duration: 0.20), value: message)
+    .animation(.snappy(duration: 0.22), value: message)
   }
 }
 
@@ -507,16 +565,38 @@ private struct WorkspaceInteractiveSurfaceModifier: ViewModifier {
     content
       .background(
         shape
-          .fill(raised ? WorkspacePalette.panelRaised : WorkspacePalette.panelBase)
+          .fill(
+            LinearGradient(
+              colors: [
+                raised ? WorkspacePalette.panelRaised : WorkspacePalette.innerCardStrong,
+                WorkspacePalette.panelBase,
+              ],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
       )
       .overlay(
         shape
           .stroke(
-            Color.white.opacity(raised ? 0.115 : 0.080),
+            Color.white.opacity(raised ? 0.12 : 0.085),
             lineWidth: 1
           )
       )
-      .shadow(color: .black.opacity(raised ? 0.18 : 0.08), radius: raised ? 18 : 7, x: 0, y: raised ? 10 : 4)
+      .overlay(alignment: .topLeading) {
+        Capsule(style: .continuous)
+          .fill(
+            LinearGradient(
+              colors: [tint.opacity(0.95), tint.opacity(0.10)],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+          .frame(width: 92, height: 3)
+          .padding(.top, 14)
+          .padding(.leading, 16)
+      }
+      .shadow(color: .black.opacity(raised ? 0.22 : 0.10), radius: raised ? 20 : 8, x: 0, y: raised ? 12 : 5)
 #else
     content
       .background(
@@ -570,6 +650,23 @@ private struct WorkspaceInteractiveSurfaceModifier: ViewModifier {
   }
 }
 
+private struct WorkspaceRevealModifier: ViewModifier {
+  let distance: CGFloat
+  @State private var isVisible = false
+
+  func body(content: Content) -> some View {
+    content
+      .opacity(isVisible ? 1 : 0.01)
+      .offset(y: isVisible ? 0 : distance)
+      .scaleEffect(isVisible ? 1 : 0.985, anchor: .top)
+      .animation(.snappy(duration: 0.34), value: isVisible)
+      .onAppear {
+        guard !isVisible else { return }
+        isVisible = true
+      }
+    }
+}
+
 extension View {
   func workspaceInteractiveSurface(
     cornerRadius: CGFloat = 30,
@@ -581,5 +678,9 @@ extension View {
 
   func workspaceAlignedCard(minHeight: CGFloat = 0) -> some View {
     frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+  }
+
+  func workspaceReveal(distance: CGFloat = 14) -> some View {
+    modifier(WorkspaceRevealModifier(distance: distance))
   }
 }

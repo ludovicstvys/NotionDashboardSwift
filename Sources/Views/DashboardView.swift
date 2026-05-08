@@ -126,13 +126,13 @@ struct DashboardView: View {
           HStack(alignment: .top, spacing: 24) {
             mastheadCopy(width: width)
             Spacer(minLength: 0)
-            mastheadSidePanel(alignment: .trailing, textAlignment: .trailing)
+            mastheadSidePanel(alignment: .trailing, textAlignment: .trailing, isTrailing: true)
               .frame(width: min(max(width * 0.26, 240), 320), alignment: .trailing)
           }
         } else {
           VStack(alignment: .leading, spacing: 18) {
             mastheadCopy(width: width)
-            mastheadSidePanel(alignment: .leading, textAlignment: .leading)
+            mastheadSidePanel(alignment: .leading, textAlignment: .leading, isTrailing: false)
           }
         }
 
@@ -162,12 +162,12 @@ struct DashboardView: View {
         .frame(width: width >= 980 ? 86 : 72)
         .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 4)
 
-      Text("TODAY")
+      Text("COMMAND CENTER")
         .font(.caption2.weight(.bold))
         .tracking(1.8)
         .foregroundStyle(Color.white.opacity(0.70))
 
-      Text(width >= 980 ? "Your operating system\nfor today." : "Your operating system for today.")
+      Text(width >= 980 ? "Operate the day\nwith one surface." : "Operate the day with one surface.")
         .font(.system(size: width >= 1_120 ? 46 : 38, weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
         .fixedSize(horizontal: false, vertical: true)
@@ -176,16 +176,23 @@ struct DashboardView: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.white.opacity(0.80))
 
-      Text("Calendar, todos, pipeline and market signals in one focused command center.")
+      Text("Calendar, pipeline, execution, and market context stitched into a dense but readable workspace.")
         .font(.subheadline)
         .foregroundStyle(Color.white.opacity(0.72))
         .fixedSize(horizontal: false, vertical: true)
+
+      HStack(spacing: 10) {
+        WorkspaceBadge(text: "\(dashboardViewModel.state.upcomingEvents.count) events", tint: WorkspacePalette.accentSoft)
+        WorkspaceBadge(text: "\(openTodoCount) open todos", tint: WorkspacePalette.accent)
+        WorkspaceBadge(text: "\(dashboardViewModel.state.pendingQueueCount) queued", tint: WorkspacePalette.warning)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  private func mastheadSidePanel(alignment: HorizontalAlignment, textAlignment: TextAlignment) -> some View {
+  private func mastheadSidePanel(alignment: HorizontalAlignment, textAlignment: TextAlignment, isTrailing: Bool) -> some View {
     VStack(alignment: alignment, spacing: 12) {
+      pillRow(isTrailing: isTrailing)
       DashboardFocusSessionBadge()
       connectionBadge
 
@@ -198,17 +205,41 @@ struct DashboardView: View {
     }
   }
 
+  private func pillRow(isTrailing: Bool) -> some View {
+    Group {
+      if isTrailing {
+        HStack(spacing: 10) {
+          Spacer(minLength: 0)
+          heroStatusPills
+        }
+      } else {
+        HStack(spacing: 10) {
+          heroStatusPills
+          Spacer(minLength: 0)
+        }
+      }
+    }
+  }
+
+  private var heroStatusPills: some View {
+    Group {
+      WorkspaceStatusPill(title: "Focus", value: focusStore.isEnabled ? "Running" : "Idle", tint: focusStore.isEnabled ? WorkspacePalette.success : WorkspacePalette.warning)
+      WorkspaceStatusPill(title: "Calendar", value: calendarConnectionText, tint: WorkspacePalette.accentSoft)
+      WorkspaceStatusPill(title: "Pipeline", value: dashboardViewModel.state.pendingQueueCount == 0 ? "Clear" : "Queued", tint: dashboardViewModel.state.pendingQueueCount == 0 ? WorkspacePalette.success : WorkspacePalette.accent)
+    }
+  }
+
   private var nextEventSpotlight: some View {
     spotlightCard(title: "Next event", tint: WorkspacePalette.accent, systemImage: "calendar.badge.clock") {
       if let event = dashboardViewModel.state.nextEvent {
+        Text(event.whenText)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(WorkspacePalette.accentSoft)
+
         Text(event.summary.isEmpty ? "Event" : event.summary)
-          .font(.headline)
+          .font(.title3.weight(.semibold))
           .foregroundStyle(.white)
           .lineLimit(2)
-
-        Text(event.whenText)
-          .font(.caption)
-          .foregroundStyle(Color.white.opacity(0.70))
 
         Text(event.location.isEmpty ? event.calendarName : event.location)
           .font(.caption)
@@ -226,14 +257,14 @@ struct DashboardView: View {
   private var nextTodoSpotlight: some View {
     spotlightCard(title: "Next todo", tint: WorkspacePalette.warning, systemImage: "checklist") {
       if let todo = nextTodo {
+        Text(todoSubtitle(for: todo))
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(WorkspacePalette.warning)
+
         Text(todo.title)
-          .font(.headline)
+          .font(.title3.weight(.semibold))
           .foregroundStyle(.white)
           .lineLimit(2)
-
-        Text(todoSubtitle(for: todo))
-          .font(.caption)
-          .foregroundStyle(Color.white.opacity(0.70))
 
         if let label = stageLabel(for: todo), !label.isEmpty {
           Text(label)
@@ -263,8 +294,8 @@ struct DashboardView: View {
 
   private func todayBoard(metrics: WorkspaceLayoutMetrics) -> some View {
     dashboardPanel(
-      title: "Today board",
-      subtitle: "Agenda and tasks stay side by side so the next move is always visible.",
+      title: "Command stream",
+      subtitle: "A single operational lane for time pressure, decisions, and execution risk.",
       tint: WorkspacePalette.warning,
       padding: metrics.regularPanelPadding
     ) {
@@ -289,7 +320,7 @@ struct DashboardView: View {
   private var agendaColumn: some View {
     VStack(alignment: .leading, spacing: 14) {
       boardHeader(
-        title: "Agenda",
+        title: "Live agenda",
         subtitle: "Upcoming calendar events",
         accent: WorkspacePalette.accent,
         countText: "\(dashboardViewModel.state.upcomingEvents.count)"
@@ -319,7 +350,7 @@ struct DashboardView: View {
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
         boardHeader(
-          title: "Todo",
+          title: "Execution queue",
           subtitle: "Deadlines and pipeline follow-ups",
           accent: WorkspacePalette.warning,
           countText: "\(openTodoCount) open"
@@ -369,7 +400,7 @@ struct DashboardView: View {
   }
 
   private var focusPanel: some View {
-    dashboardPanel(title: "Focus", subtitle: "Pomodoro guardrails and blocked distractions", tint: .pink) {
+    dashboardPanel(title: "Focus engine", subtitle: "Session control, blockers, and recovery in one lane.", tint: WorkspacePalette.accentSoft) {
       VStack(alignment: .leading, spacing: 16) {
         HStack(alignment: .lastTextBaseline, spacing: 12) {
           Text(focusStore.isEnabled ? focusTimeText : "Ready")
@@ -381,14 +412,14 @@ struct DashboardView: View {
         }
 
         ProgressView(value: focusProgress)
-          .tint(.pink)
+          .tint(WorkspacePalette.accentSoft)
 
         HStack(spacing: 10) {
           Button(focusStore.isEnabled ? "Restart" : "Start focus") {
             focusStore.startSession()
           }
           .buttonStyle(.borderedProminent)
-          .tint(.pink)
+          .tint(WorkspacePalette.accentSoft)
 
           Button(focusStore.isPaused ? "Resume" : "Pause") {
             focusStore.togglePause()
@@ -412,7 +443,7 @@ struct DashboardView: View {
   }
 
   private var marketsPanel: some View {
-    dashboardPanel(title: "Markets", subtitle: "Same compact readout style as the widgets", tint: WorkspacePalette.success) {
+    dashboardPanel(title: "Market pulse", subtitle: "Compact pricing context with enough signal to stay oriented.", tint: WorkspacePalette.success) {
       VStack(alignment: .leading, spacing: 14) {
         if marketNewsStore.quotes.isEmpty {
           WorkspaceEmptyState(
@@ -518,6 +549,7 @@ struct DashboardView: View {
       RoundedRectangle(cornerRadius: 22, style: .continuous)
         .stroke(WorkspacePalette.success.opacity(0.18), lineWidth: 1)
     }
+    .shadow(color: WorkspacePalette.success.opacity(0.10), radius: 18, x: 0, y: 8)
   }
 
   private func marketQuoteRow(_ quote: MarketQuote) -> some View {
@@ -630,7 +662,7 @@ struct DashboardView: View {
           .fill(LinearGradient(
             colors: [
               eventTypeColor(for: event.eventType).opacity(0.12),
-              Color.white.opacity(0.04)
+              Color.white.opacity(0.06)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -728,7 +760,7 @@ struct DashboardView: View {
         .fill(LinearGradient(
           colors: [
             todoStatusColor(todo.status).opacity(isHighlighted ? 0.14 : 0.08),
-            Color.white.opacity(isHighlighted ? 0.06 : 0.02)
+            Color.white.opacity(isHighlighted ? 0.07 : 0.04)
           ],
           startPoint: .topLeading,
           endPoint: .bottomTrailing
@@ -808,12 +840,13 @@ struct DashboardView: View {
         Text(title)
           .font(.caption.weight(.bold))
           .foregroundStyle(Color.white.opacity(0.72))
+          .tracking(0.4)
       }
 
       content()
     }
     .padding(18)
-    .workspaceAlignedCard(minHeight: 166)
+    .workspaceAlignedCard(minHeight: 176)
     .workspaceInteractiveSurface(cornerRadius: 22, tint: tint, raised: false)
   }
 
@@ -845,7 +878,7 @@ struct DashboardView: View {
     HStack(alignment: .top, spacing: 12) {
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
-          .font(.title3.weight(.semibold))
+          .font(.system(size: 22, weight: .semibold, design: .rounded))
           .foregroundStyle(.white)
         Text(subtitle)
           .font(.caption)
@@ -888,12 +921,13 @@ struct DashboardView: View {
       if let title {
         VStack(alignment: .leading, spacing: 4) {
           Text(title)
-            .font(.title3.weight(.bold))
+            .font(.system(size: 24, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
           if let subtitle {
             Text(subtitle)
               .font(.caption)
               .foregroundStyle(Color.white.opacity(0.66))
+              .lineSpacing(1)
           }
         }
       }
@@ -907,7 +941,7 @@ struct DashboardView: View {
 
   private func splitDivider(isVertical: Bool) -> some View {
     Rectangle()
-      .fill(Color.white.opacity(0.08))
+      .fill(Color.white.opacity(0.06))
       .frame(width: isVertical ? 1 : nil, height: isVertical ? nil : 1)
   }
 
@@ -1077,45 +1111,76 @@ private struct TodoEditorView: View {
   }
 
   var body: some View {
-    Form {
-      Section("Todo") {
-        TextField("Title", text: $title)
-        DatePicker("Due date", selection: $dueDate, displayedComponents: [.date])
-        Picker("Status", selection: $status) {
-          ForEach(TodoStatus.allCases) { status in
-            Text(status.rawValue).tag(status)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        WorkspacePanel(
+          title: "Todo",
+          subtitle: "Core execution details for this follow-up item.",
+          tint: WorkspacePalette.warning,
+          padding: 20
+        ) {
+          VStack(alignment: .leading, spacing: 14) {
+            TextField("Title", text: $title)
+              .textFieldStyle(.roundedBorder)
+            DatePicker("Due date", selection: $dueDate, displayedComponents: [.date])
+            Picker("Status", selection: $status) {
+              ForEach(TodoStatus.allCases) { status in
+                Text(status.rawValue).tag(status)
+              }
+            }
           }
         }
-      }
 
-      Section("Context") {
-        Picker("Related stage", selection: $relatedStageID) {
-          Text("None").tag("")
-          ForEach(stages) { stage in
-            Text(stage.displayLabel.isEmpty ? "Stage" : stage.displayLabel).tag(stage.id)
+        WorkspacePanel(
+          title: "Context",
+          subtitle: "Keep the todo attached to the right opportunity and notes.",
+          tint: WorkspacePalette.accentSoft,
+          padding: 20
+        ) {
+          VStack(alignment: .leading, spacing: 14) {
+            Picker("Related stage", selection: $relatedStageID) {
+              Text("None").tag("")
+              ForEach(stages) { stage in
+                Text(stage.displayLabel.isEmpty ? "Stage" : stage.displayLabel).tag(stage.id)
+              }
+            }
+            TextEditor(text: $notes)
+              .frame(minHeight: 140)
+              .padding(8)
+              .scrollContentBackground(.hidden)
+              .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                  .fill(WorkspacePalette.innerCardStrong)
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                  .stroke(Color.white.opacity(0.08), lineWidth: 1)
+              )
           }
         }
-        TextEditor(text: $notes)
-          .frame(minHeight: 120)
-      }
 
-      Section {
-        Button("Save changes") {
-          onSave(title, dueDate, notes, relatedStageID, status)
-          dismiss()
-        }
-        .buttonStyle(.borderedProminent)
-
-        if allowsDelete {
-          Button(role: .destructive) {
-            onDelete()
+        HStack(spacing: 10) {
+          Button("Save changes") {
+            onSave(title, dueDate, notes, relatedStageID, status)
             dismiss()
-          } label: {
-            Text("Delete todo")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(WorkspacePalette.accent)
+
+          if allowsDelete {
+            Button(role: .destructive) {
+              onDelete()
+              dismiss()
+            } label: {
+              Text("Delete todo")
+            }
+            .buttonStyle(.bordered)
           }
         }
       }
+      .padding(18)
     }
+    .background(WorkspaceBackground().equatable())
   }
 }
 
@@ -1142,36 +1207,41 @@ private struct DashboardNewsPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
       VStack(alignment: .leading, spacing: 4) {
-        Text("News")
-          .font(.headline.weight(.semibold))
+        Text("Signal feed")
+          .font(.system(size: 24, weight: .semibold, design: .rounded))
           .foregroundStyle(.white)
-        Text("Headlines that may affect the market context")
+        Text("Headlines that may reshape the risk picture around your day")
           .font(.caption)
           .foregroundStyle(Color.white.opacity(0.66))
       }
 
       ScrollView(.vertical, showsIndicators: true) {
         VStack(alignment: .leading, spacing: 12) {
-        if marketNewsStore.news.isEmpty {
-          Text(marketNewsStore.isLoadingNews ? "Loading headlines..." : "No headline available.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          ForEach(marketNewsStore.news.prefix(4)) { item in
-            HStack(alignment: .top, spacing: 12) {
-              VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                  .font(.subheadline.weight(.semibold))
-                  .lineLimit(3)
-                Text("\(item.source) · \(item.publishedAt.shortDateTime)")
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
+          if marketNewsStore.news.isEmpty {
+            WorkspaceEmptyState(
+              title: marketNewsStore.isLoadingNews ? "Loading headlines" : "No signal yet",
+              message: marketNewsStore.isLoadingNews
+                ? "Refreshing the news layer for this command center."
+                : "No market-moving headlines are available right now.",
+              tint: WorkspacePalette.accent,
+              systemImage: "newspaper"
+            )
+          } else {
+            ForEach(marketNewsStore.news.prefix(4)) { item in
+              HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                  Text("\(item.source) · \(item.publishedAt.shortDateTime)")
+                    .font(.caption2)
+                    .foregroundStyle(WorkspacePalette.subtleText)
+                }
+                Spacer()
               }
-              Spacer()
             }
-            .padding(.vertical, 2)
           }
-        }
         }
       }
     }

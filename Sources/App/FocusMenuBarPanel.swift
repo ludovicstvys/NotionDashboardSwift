@@ -55,6 +55,19 @@ struct FocusMenuBarPanel: View {
           .offset(x: 105, y: -100)
       }
     }
+    .overlay {
+      RoundedRectangle(cornerRadius: 28, style: .continuous)
+        .stroke(
+          LinearGradient(
+            colors: [Color.white.opacity(0.14), Color.white.opacity(0.04)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          lineWidth: 1
+        )
+    }
+    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 12)
   }
 
   private var header: some View {
@@ -63,7 +76,7 @@ struct FocusMenuBarPanel: View {
         Text(focusStore.isEnabled ? focusStore.focusSummary : "Pomodoro ready")
           .font(.system(size: 20, weight: .semibold, design: .rounded))
           .foregroundStyle(WorkspacePalette.primaryText)
-        Text(focusStore.isEnabled ? "Focus guardrails are active" : "Start a work session from here")
+        Text(focusStore.isEnabled ? "Focus guardrails are active" : "Start a focused work block from here")
           .font(.caption)
           .foregroundStyle(WorkspacePalette.subtleText)
       }
@@ -172,6 +185,7 @@ struct FocusMenuBarPanel: View {
     }
     .font(.caption2.weight(.semibold))
     .foregroundStyle(WorkspacePalette.subtleText)
+    .padding(.top, 2)
   }
 
   private var statusTint: Color {

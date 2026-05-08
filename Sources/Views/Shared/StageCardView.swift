@@ -40,6 +40,7 @@ struct StageCardView: View {
           .font(.caption)
           .foregroundStyle(Color.white.opacity(0.68))
           .lineLimit(3)
+          .lineSpacing(1)
       }
 
       HStack(spacing: 8) {
@@ -79,6 +80,7 @@ struct StageCardView: View {
       RoundedRectangle(cornerRadius: 22, style: .continuous)
         .stroke(isHighlighted ? WorkspacePalette.accent.opacity(0.34) : Color.white.opacity(0.08), lineWidth: 1)
     }
+    .workspaceReveal(distance: 12)
   }
 
   private func stageMetaChip(text: String, systemImage: String, tint: Color, usesNeutralStyle: Bool = false) -> some View {
@@ -126,6 +128,7 @@ struct StageListRowView: View, Equatable {
         .font(.caption.weight(.medium))
         .foregroundStyle(Color.white.opacity(0.72))
         .lineLimit(2)
+        .lineSpacing(1)
 
       HStack(spacing: 8) {
         Text(item.updatedAt.shortDate)
@@ -152,12 +155,22 @@ struct StageListRowView: View, Equatable {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .fill(isSelected ? WorkspacePalette.panelRaised : WorkspacePalette.panelBase.opacity(0.54))
+        .fill(
+          LinearGradient(
+            colors: [
+              isSelected ? WorkspacePalette.innerCardStrong : Color.white.opacity(0.03),
+              isSelected ? WorkspacePalette.panelRaised : WorkspacePalette.panelBase.opacity(0.54)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        )
     )
     .overlay(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .stroke(isSelected ? WorkspacePalette.accent.opacity(0.22) : Color.white.opacity(0.06), lineWidth: 1)
     )
+    .workspaceReveal(distance: 8)
   }
 
   private func colorForStatus(_ status: StageStatus) -> Color {
@@ -248,6 +261,7 @@ struct StageDetailPanel: View {
           Text(detail.stage.notes)
             .font(.subheadline)
             .foregroundStyle(Color.white.opacity(0.78))
+            .lineSpacing(1)
             .fixedSize(horizontal: false, vertical: true)
         }
       }
@@ -281,14 +295,7 @@ struct StageDetailPanel: View {
     }
     .padding(22)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: 24, style: .continuous)
-        .fill(WorkspacePalette.panelRaised)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 24, style: .continuous)
-        .stroke(WorkspacePalette.warning.opacity(0.20), lineWidth: 1)
-    )
+    .workspaceInteractiveSurface(cornerRadius: 24, tint: WorkspacePalette.warning)
   }
 
   private func infoChip(title: String, systemImage: String, tint: Color, neutral: Bool = false) -> some View {

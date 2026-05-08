@@ -29,6 +29,7 @@ struct CalendarView: View {
           let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
           ScrollView {
             LazyVStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+              calendarHeroPanel(metrics: metrics)
               dayCalendarPanel(width: proxy.size.width)
               connectionPanel
             }
@@ -116,8 +117,8 @@ struct CalendarView: View {
 
   private var connectionPanel: some View {
     WorkspacePanel(
-      title: "Connections and sources",
-      subtitle: "Manage Google auth, filters, notifications, and external calendars from one place.",
+      title: "Sources and actions",
+      subtitle: "Manage Google auth, filters, notifications, and event creation from one control layer.",
       tint: WorkspacePalette.warning
     ) {
       VStack(alignment: .leading, spacing: 18) {
@@ -230,8 +231,8 @@ struct CalendarView: View {
 
   private func dayCalendarPanel(width: CGFloat) -> some View {
     WorkspacePanel(
-      title: "Calendar",
-      subtitle: "Switch between day, week, and list views without leaving the schedule.",
+      title: "Timeline lens",
+      subtitle: "Switch between day, week, and list views without losing the active date context.",
       tint: WorkspacePalette.accentSoft
     ) {
       if calendarStore.isLoading {
@@ -274,6 +275,44 @@ struct CalendarView: View {
     .id("calendar-event-feed")
   }
 
+  private func calendarHeroPanel(metrics: WorkspaceLayoutMetrics) -> some View {
+    WorkspaceHeroPanel(tint: WorkspacePalette.accent, padding: metrics.regularPanelPadding) {
+      VStack(alignment: .leading, spacing: 22) {
+        HStack(alignment: .top, spacing: 20) {
+          VStack(alignment: .leading, spacing: 12) {
+            Text("TIME OPERATIONS")
+              .font(.caption2.weight(.bold))
+              .tracking(1.8)
+              .foregroundStyle(Color.white.opacity(0.70))
+
+            Text("Timeline control.\nContext intact.")
+              .font(.system(size: metrics.sizeClass == .wide ? 40 : 34, weight: .semibold, design: .rounded))
+              .foregroundStyle(.white)
+
+            Text("Run the day through a single timeline with clearer source state, faster event actions, and less visual noise.")
+              .font(.subheadline)
+              .foregroundStyle(Color.white.opacity(0.72))
+              .fixedSize(horizontal: false, vertical: true)
+          }
+
+          Spacer(minLength: 0)
+
+          VStack(alignment: .trailing, spacing: 10) {
+            WorkspaceBadge(text: displayMode.rawValue, tint: WorkspacePalette.accent)
+            WorkspaceBadge(text: sourceCount == 0 ? "No sources" : "\(sourceCount) source\(sourceCount == 1 ? "" : "s")", tint: WorkspacePalette.accentSoft)
+          }
+        }
+
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
+          calendarMetric(title: "Today", value: "\(events(for: Calendar.current.startOfDay(for: Date())).count)", detail: "events in focus", tint: WorkspacePalette.accent)
+          calendarMetric(title: "Week", value: "\(weekEvents(for: selectedDay).count)", detail: "events in active week", tint: WorkspacePalette.accentSoft)
+          calendarMetric(title: "Sources", value: "\(sourceCount)", detail: sourceCount == 0 ? "nothing connected" : "feeds currently active", tint: WorkspacePalette.warning)
+          calendarMetric(title: "Alerts", value: notificationCountLabel, detail: notificationStatusText.lowercased(), tint: WorkspacePalette.success)
+        }
+      }
+    }
+  }
+
   private var calendarHeader: some View {
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .center, spacing: 12) {
@@ -313,7 +352,7 @@ struct CalendarView: View {
             .tracking(1.4)
             .foregroundStyle(Color.white.opacity(0.58))
           Text(selectedDay.formatted(.dateTime.month(.wide).day().year()))
-            .font(.system(size: 30, weight: .semibold, design: .rounded))
+            .font(.system(size: 32, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
         }
         Spacer()
@@ -349,7 +388,7 @@ struct CalendarView: View {
       ForEach(calendarViewModel.state.groupedEvents) { group in
         VStack(alignment: .leading, spacing: 10) {
           Text(group.day.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-            .font(.headline.weight(.semibold))
+            .font(.system(size: 24, weight: .semibold, design: .rounded))
             .foregroundStyle(.white)
           ForEach(group.items) { event in
             CalendarEventRow(
@@ -377,6 +416,7 @@ struct CalendarView: View {
               Text(group.day.formatted(.dateTime.weekday(.abbreviated)))
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Color.white.opacity(isSelected ? 0.82 : 0.56))
+                .tracking(0.5)
               Text(group.day.formatted(.dateTime.day()))
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
@@ -526,14 +566,25 @@ struct CreateGoogleEventSheet: View {
 
   var body: some View {
     NavigationStack {
-      Form {
-        TextField("Summary", text: $summary)
-        TextField("Location", text: $location)
-        TextField("Description", text: $description, axis: .vertical)
-          .lineLimit(3...8)
-        DatePicker("Start", selection: $start)
-        DatePicker("End", selection: $end)
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          WorkspacePanel(title: "Event", subtitle: "Core details for the new Google Calendar entry.", tint: WorkspacePalette.accent, padding: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+              TextField("Summary", text: $summary)
+                .textFieldStyle(.roundedBorder)
+              TextField("Location", text: $location)
+                .textFieldStyle(.roundedBorder)
+              TextField("Description", text: $description, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(3...8)
+              DatePicker("Start", selection: $start)
+              DatePicker("End", selection: $end)
+            }
+          }
+        }
+        .padding(18)
       }
+      .background(WorkspaceBackground().equatable())
       .navigationTitle("Create Google event")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
@@ -578,14 +629,25 @@ struct EditGoogleEventSheet: View {
 
   var body: some View {
     NavigationStack {
-      Form {
-        TextField("Summary", text: $summary)
-        TextField("Location", text: $location)
-        TextField("Description", text: $description, axis: .vertical)
-          .lineLimit(3...8)
-        DatePicker("Start", selection: $start)
-        DatePicker("End", selection: $end)
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          WorkspacePanel(title: "Event", subtitle: "Update timing, context, and Google Calendar metadata.", tint: WorkspacePalette.accent, padding: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+              TextField("Summary", text: $summary)
+                .textFieldStyle(.roundedBorder)
+              TextField("Location", text: $location)
+                .textFieldStyle(.roundedBorder)
+              TextField("Description", text: $description, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(3...8)
+              DatePicker("Start", selection: $start)
+              DatePicker("End", selection: $end)
+            }
+          }
+        }
+        .padding(18)
       }
+      .background(WorkspaceBackground().equatable())
       .navigationTitle("Edit Google event")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
@@ -662,7 +724,13 @@ struct CalendarWeekView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 24, style: .continuous)
-        .fill(Color.black.opacity(0.20))
+        .fill(
+          LinearGradient(
+            colors: [Color.white.opacity(0.06), Color.black.opacity(0.14)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        )
     )
     .overlay {
       RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -805,12 +873,21 @@ struct CalendarWeekView: View {
       .padding(.horizontal, 8)
       .padding(.vertical, 7)
       .background(
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .fill(isHighlighted ? Color(red: 0.54, green: 0.45, blue: 0.34) : Color(red: 0.39, green: 0.32, blue: 0.24))
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .fill(
+            LinearGradient(
+              colors: [
+                eventTypeColor(for: event.eventType).opacity(isHighlighted ? 0.42 : 0.26),
+                WorkspacePalette.panelBase.opacity(0.92)
+              ],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
       )
       .overlay {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .stroke(isHighlighted ? Color(red: 0.92, green: 0.79, blue: 0.56).opacity(0.75) : Color(red: 0.78, green: 0.63, blue: 0.39).opacity(0.55), lineWidth: 1)
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .stroke(isHighlighted ? eventTypeColor(for: event.eventType).opacity(0.72) : Color.white.opacity(0.10), lineWidth: 1)
       }
       .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 2)
     }
@@ -963,7 +1040,13 @@ struct CalendarDayTimelineView: View {
       .frame(minHeight: 620, maxHeight: 820)
       .background(
         RoundedRectangle(cornerRadius: 26, style: .continuous)
-          .fill(Color.black.opacity(0.16))
+          .fill(
+            LinearGradient(
+              colors: [Color.white.opacity(0.05), Color.black.opacity(0.14)],
+              startPoint: .topLeading,
+              endPoint: .bottomTrailing
+            )
+          )
       )
       .overlay {
         RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -1014,8 +1097,7 @@ struct CalendarDayTimelineView: View {
       }
     }
     .padding(14)
-    .background(Color.white.opacity(0.06))
-    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    .workspaceInteractiveSurface(cornerRadius: 22, tint: WorkspacePalette.accentSoft, raised: false)
   }
 
   private func hourGrid(timelineWidth: CGFloat) -> some View {
@@ -1327,11 +1409,20 @@ struct CalendarEventRow: View, Equatable {
     .padding(.vertical, 12)
     .background(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .fill(WorkspacePalette.panelBase.opacity(0.58))
+        .fill(
+          LinearGradient(
+            colors: [
+              eventTypeColor(for: event.eventType).opacity(0.08),
+              WorkspacePalette.panelBase.opacity(0.58)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          )
+        )
     )
     .overlay(
       RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(isHighlighted ? Color.white.opacity(0.18) : Color.white.opacity(0.06), lineWidth: 1)
+        .stroke(isHighlighted ? eventTypeColor(for: event.eventType).opacity(0.34) : Color.white.opacity(0.06), lineWidth: 1)
     )
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .onTapGesture {
@@ -1433,12 +1524,16 @@ struct CalendarEventDetailView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 12) {
-        row("Calendar", event.calendarName)
-        row("When", event.whenText)
-        row("Location", event.location)
-        row("Description", event.description)
-        row("Attendees", event.attendees.joined(separator: ", "))
+      VStack(alignment: .leading, spacing: 18) {
+        WorkspacePanel(title: event.summary.isEmpty ? "Event" : event.summary, subtitle: event.whenText, tint: eventTypeColor(for: event.eventType), padding: 20) {
+          VStack(alignment: .leading, spacing: 12) {
+            row("Calendar", event.calendarName)
+            row("When", event.whenText)
+            row("Location", event.location)
+            row("Description", event.description)
+            row("Attendees", event.attendees.joined(separator: ", "))
+          }
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(18)
@@ -1461,13 +1556,24 @@ struct CalendarEventDetailView: View {
         .foregroundStyle(.secondary)
       Text(value.isEmpty ? "-" : value)
         .font(.subheadline)
+        .foregroundStyle(.white)
         .textSelection(.enabled)
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(WorkspacePalette.innerCard)
-    )
+    .workspaceInteractiveSurface(cornerRadius: 16, tint: .white, raised: false)
+  }
+
+  private func eventTypeColor(for type: EventType) -> Color {
+    switch type {
+    case .meeting:
+      return WorkspacePalette.accent
+    case .interview:
+      return WorkspacePalette.warning
+    case .deadline:
+      return .red
+    case .defaultType:
+      return WorkspacePalette.accentSoft
+    }
   }
 }

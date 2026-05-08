@@ -15,3 +15,7 @@ NotionDashboard.dmg
 *.xcodeproj/xcuserdata/
 NotionDashboardSwift.xcodeproj/project.xcworkspace/xcuserdata/
 NotionDashboardSwift.xcodeproj/xcuserdata/
+.agents/
+.codex/
+AGENTS.md
+.env

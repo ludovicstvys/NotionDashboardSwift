@@ -14,6 +14,7 @@ struct StagesView: View {
       GeometryReader { proxy in
         let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
         VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+          overviewPanel(metrics: metrics)
           commandBar
           listAndDetailBoard(width: proxy.size.width)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -55,6 +56,7 @@ struct StagesView: View {
         let metrics = WorkspaceLayoutMetrics(width: proxy.size.width)
         ScrollView {
           VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+            overviewPanel(metrics: metrics)
             commandBar
             listAndDetailBoard(width: proxy.size.width)
           }
@@ -97,16 +99,16 @@ struct StagesView: View {
       VStack(alignment: .leading, spacing: metrics.panelGap) {
         HStack(alignment: .top, spacing: metrics.panelGap) {
           VStack(alignment: .leading, spacing: 10) {
-            Text("PIPELINE")
+            Text("PIPELINE CONTROL")
               .font(.caption2.weight(.bold))
               .tracking(1.8)
               .foregroundStyle(Color.white.opacity(0.70))
 
-            Text("Pipeline overview.\nDecision-ready.")
+            Text("Decision-ready funnel.\nFast to scan.")
               .font(.system(size: metrics.sizeClass == .wide ? 38 : 33, weight: .semibold, design: .rounded))
               .foregroundStyle(.white)
 
-            Text("Track every opportunity with a fast index, clear status signals, and a focused detail panel.")
+            Text("Track every opportunity with a tighter visual index, stronger state contrast, and an inspection panel built for quick triage.")
               .font(.subheadline)
               .foregroundStyle(Color.white.opacity(0.72))
           }
@@ -157,8 +159,8 @@ struct StagesView: View {
   
   private var commandBar: some View {
     WorkspaceCommandBar(
-      title: "Workspace",
-      subtitle: "Search, sync, and review without leaving the split view."
+      title: "Command lane",
+      subtitle: "Search, sync, and review the funnel without losing selection context."
     ) {
       Button {
         Task { await stageStore.syncFromNotion() }
@@ -175,8 +177,8 @@ struct StagesView: View {
 
   private var listPanel: some View {
     WorkspacePanel(
-      title: "Stages list",
-      subtitle: "A lighter, faster index of your current pipeline.",
+      title: "Pipeline index",
+      subtitle: "A fast moving list of active opportunities and their latest state.",
       tint: WorkspacePalette.accent
     ) {
       if stagesViewModel.listState.items.isEmpty {
@@ -235,8 +237,8 @@ struct StagesView: View {
 
   private var detailPanel: some View {
     WorkspacePanel(
-      title: "Stage detail",
-      subtitle: "The selected record expands here with status and related follow-ups.",
+      title: "Opportunity brief",
+      subtitle: "The selected record expands here with movement, notes, and linked follow-ups.",
       tint: WorkspacePalette.warning
     ) {
       if let detail = stagesViewModel.selectedStageDetail {

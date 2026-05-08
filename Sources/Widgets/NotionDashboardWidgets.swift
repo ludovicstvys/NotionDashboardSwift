@@ -23,27 +23,73 @@ private struct WidgetProvider: TimelineProvider {
 }
 
 private enum WidgetPalette {
-  static let panel = Color(red: 0.10, green: 0.12, blue: 0.16)
-  static let border = Color.white.opacity(0.08)
-  static let subtle = Color.white.opacity(0.66)
-  static let muted = Color.white.opacity(0.52)
-  static let orange = Color.orange
-  static let blue = Color.blue
-  static let teal = Color.teal
+  static let panel = Color(red: 0.05, green: 0.07, blue: 0.10)
+  static let panelTop = Color(red: 0.09, green: 0.12, blue: 0.16)
+  static let panelHighlight = Color.white.opacity(0.05)
+  static let surface = Color.white.opacity(0.06)
+  static let surfaceStrong = Color.white.opacity(0.10)
+  static let border = Color.white.opacity(0.12)
+  static let subtle = Color.white.opacity(0.76)
+  static let muted = Color.white.opacity(0.54)
+  static let orange = Color(red: 0.93, green: 0.68, blue: 0.29)
+  static let blue = Color(red: 0.18, green: 0.74, blue: 0.92)
+  static let teal = Color(red: 0.44, green: 0.86, blue: 0.76)
+  static let yellow = Color(red: 0.96, green: 0.78, blue: 0.28)
+  static let primaryText = Color.white.opacity(0.97)
+  static let secondaryText = Color.white.opacity(0.84)
 }
 
 private struct WidgetCardBackground: View {
   let tint: Color
 
   var body: some View {
-    LinearGradient(
-      colors: [
-        WidgetPalette.panel,
-        tint.opacity(0.34),
-      ],
-      startPoint: .topLeading,
-      endPoint: .bottomTrailing
-    )
+    ZStack {
+      LinearGradient(
+        colors: [
+          WidgetPalette.panelTop,
+          tint.opacity(0.12),
+          WidgetPalette.panel,
+          Color.black.opacity(0.24),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+
+      RadialGradient(
+        colors: [
+          tint.opacity(0.28),
+          .clear,
+        ],
+        center: .topTrailing,
+        startRadius: 10,
+        endRadius: 150
+      )
+
+      RadialGradient(
+        colors: [
+          tint.opacity(0.14),
+          .clear,
+        ],
+        center: .bottomLeading,
+        startRadius: 6,
+        endRadius: 110
+      )
+
+      RoundedRectangle(cornerRadius: 28, style: .continuous)
+        .fill(
+          LinearGradient(
+            colors: [
+              WidgetPalette.panelHighlight,
+              .clear,
+            ],
+            startPoint: .topLeading,
+            endPoint: .center
+          )
+        )
+
+      RoundedRectangle(cornerRadius: 28, style: .continuous)
+        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+    }
   }
 }
 
@@ -191,74 +237,66 @@ private struct PomodoroSmallWidgetView: View {
     return entry.snapshot.phase == "shortBreak" ? "Break" : "Work"
   }
 
-  private var modeText: String {
-    if !entry.snapshot.isEnabled { return "Idle" }
-    return entry.snapshot.phase == "shortBreak" ? "Break" : "Work"
-  }
-
   private var tint: Color {
     if !entry.snapshot.isEnabled { return WidgetPalette.muted }
-    if entry.snapshot.isPaused { return .yellow }
+    if entry.snapshot.isPaused { return WidgetPalette.yellow }
     return entry.snapshot.phase == "shortBreak" ? WidgetPalette.teal : WidgetPalette.orange
   }
 
   var body: some View {
     WidgetCard(
       title: "Pomodoro",
+      symbol: "timer",
       tint: tint,
       url: WidgetDeepLink.settings(),
       generatedAt: entry.snapshot.generatedAt
     ) {
-      VStack(alignment: .leading, spacing: 12) {
-        ZStack {
-          Circle()
-            .stroke(WidgetPalette.border, lineWidth: 12)
-
-          Circle()
-            .trim(from: 0, to: max(0.01, progress))
-            .stroke(
-              AngularGradient(
-                colors: [
-                  tint.opacity(0.55),
-                  tint,
-                  .white.opacity(0.9),
-                  tint.opacity(0.55)
-                ],
-                center: .center
-              ),
-              style: StrokeStyle(lineWidth: 12, lineCap: .round)
-            )
-            .rotationEffect(.degrees(-90))
-            .shadow(color: tint.opacity(0.35), radius: 8)
-
-          Circle()
-            .fill(WidgetPalette.panel)
-            .frame(width: 92, height: 92)
-
-          VStack(spacing: 2) {
-            timerLabel
-
-            Text(modeText)
-              .font(.caption2.weight(.bold))
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(entry.snapshot.isEnabled ? "Session live" : "Focus ready")
+              .font(.system(size: 11, weight: .semibold, design: .rounded))
               .foregroundStyle(tint)
-              .padding(.horizontal, 7)
-              .padding(.vertical, 2)
-              .background(tint.opacity(0.16))
-              .clipShape(Capsule())
+              .textCase(.uppercase)
+              .tracking(0.8)
+
+            timerLabel
+              .font(.system(size: 34, weight: .bold, design: .rounded))
+
+            Text(statusText)
+              .font(.caption)
+              .foregroundStyle(WidgetPalette.secondaryText)
+              .lineLimit(2)
+          }
+
+          Spacer(minLength: 0)
+
+          VStack(alignment: .trailing, spacing: 8) {
+            WidgetInfoCapsule(
+              label: entry.snapshot.phase == "shortBreak" ? "Break" : "Work",
+              tint: tint,
+              usesNeutralTint: !entry.snapshot.isEnabled
+            )
+
+            if entry.snapshot.isPaused {
+              WidgetInfoCapsule(label: "Paused", tint: WidgetPalette.yellow)
+            }
           }
         }
-        .frame(maxWidth: .infinity)
 
-        VStack(alignment: .leading, spacing: 4) {
-          Text(statusText)
-            .font(.headline)
-            .foregroundStyle(.white)
-            .lineLimit(1)
+        WidgetProgressBar(progress: progress, tint: tint)
 
-          Text(entry.snapshot.isEnabled ? "Work \(max(1, entry.snapshot.workMinutes))m • Break \(max(1, entry.snapshot.breakMinutes))m" : "Tap to open the dashboard")
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 8) {
+            WidgetInfoCapsule(label: "Work \(max(1, entry.snapshot.workMinutes))m", tint: tint)
+            WidgetInfoCapsule(label: "Break \(max(1, entry.snapshot.breakMinutes))m", tint: WidgetPalette.subtle, usesNeutralTint: true)
+          }
+
+          Text(entry.snapshot.isEnabled ? entry.snapshot.summary : "Tap to open the dashboard")
             .font(.caption)
-            .foregroundStyle(WidgetPalette.subtle)
+            .foregroundStyle(WidgetPalette.secondaryText)
             .lineLimit(2)
+            .lineSpacing(1)
         }
       }
     }
@@ -277,43 +315,61 @@ private struct TodoSmallWidgetView: View {
   }
 
   var body: some View {
-    WidgetCard(title: "Next todos", tint: WidgetPalette.orange, url: WidgetDeepLink.todo(nextTodos.first?.id), generatedAt: entry.snapshot.generatedAt) {
+    WidgetCard(title: "Next todos", symbol: "checklist", tint: WidgetPalette.orange, url: WidgetDeepLink.todo(nextTodos.first?.id), generatedAt: entry.snapshot.generatedAt) {
       if !nextTodos.isEmpty {
-        VStack(alignment: .leading, spacing: 8) {
-          ForEach(Array(nextTodos.enumerated()), id: \.element.id) { index, todo in
-            VStack(alignment: .leading, spacing: 2) {
-              HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(index + 1).")
-                  .font(.caption.weight(.bold))
-                  .foregroundStyle(WidgetPalette.subtle)
+        VStack(alignment: .leading, spacing: 12) {
+          let hero = nextTodos[0]
 
-                Text(todo.title)
-                  .font(.caption.weight(.semibold))
-                  .foregroundStyle(.white)
-                  .lineLimit(1)
+          HStack(alignment: .top, spacing: 12) {
+            WidgetKeyFigure(
+              value: "\(nextTodos.count)",
+              label: nextTodos.count == 1 ? "todo ready" : "todos ready",
+              detail: nextTodos.count == 1 ? "One task needs attention" : "Next items in your queue",
+              tint: WidgetPalette.orange
+            )
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .trailing, spacing: 6) {
+              WidgetInfoCapsule(label: hero.dueDate.formatted(.dateTime.day().month(.abbreviated)), tint: WidgetPalette.orange)
+              if !hero.relatedStageLabel.isEmpty {
+                WidgetInfoCapsule(label: hero.relatedStageLabel, tint: WidgetPalette.subtle, usesNeutralTint: true)
               }
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(12)
+          .background(WidgetPanel(tint: WidgetPalette.orange))
 
-              HStack(spacing: 6) {
-                Text(todo.dueDate, style: .date)
-                  .font(.caption2)
-                  .foregroundStyle(WidgetPalette.muted)
+          VStack(alignment: .leading, spacing: 8) {
+            Text(hero.title)
+              .font(.system(size: 17, weight: .bold, design: .rounded))
+              .foregroundStyle(WidgetPalette.primaryText)
+              .lineLimit(2)
+              .minimumScaleFactor(0.85)
+              .lineSpacing(1)
 
-                if !todo.relatedStageLabel.isEmpty {
-                  Text("•")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(WidgetPalette.muted)
+            Text("Next up")
+              .font(.system(size: 11, weight: .semibold, design: .rounded))
+              .foregroundStyle(WidgetPalette.muted)
+              .textCase(.uppercase)
+              .tracking(0.7)
 
-                  Text(todo.relatedStageLabel)
-                    .font(.caption2)
-                    .foregroundStyle(WidgetPalette.muted)
-                    .lineLimit(1)
+            if nextTodos.count > 1 {
+              VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(nextTodos.dropFirst().prefix(2)), id: \.id) { todo in
+                  WidgetMiniRow(
+                    title: todo.title,
+                    detail: todo.relatedStageLabel.isEmpty ? "Due soon" : todo.relatedStageLabel,
+                    tint: WidgetPalette.orange
+                  )
                 }
               }
             }
           }
         }
       } else {
-        EmptyWidgetState(title: "No pending todo", subtitle: "Your queue is clear.")
+        EmptyWidgetState(title: "No pending todo", subtitle: "Your queue is clear. Open the app when you want to add the next item.")
       }
     }
   }
@@ -330,33 +386,55 @@ private struct OpenStagesSmallWidgetView: View {
 
   var body: some View {
     WidgetCard(
-      title: "Open stages",
+      title: "Pipeline",
+      symbol: "briefcase",
       tint: WidgetPalette.blue,
       url: WidgetDeepLink.stage(openStages.first?.id),
       generatedAt: entry.snapshot.generatedAt
     ) {
-      if let stage = openStages.first {
-        VStack(alignment: .leading, spacing: 8) {
-          Text("\(openStages.count)")
-            .font(.system(size: 30, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
+      if !openStages.isEmpty {
+        VStack(alignment: .leading, spacing: 12) {
+          let leadStage = openStages[0]
 
-          Text(stage.company.isEmpty ? "Unknown company" : stage.company)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(WidgetPalette.subtle)
-            .lineLimit(1)
+          WidgetKeyFigure(
+            value: "\(openStages.count)",
+            label: openStages.count == 1 ? "open stage" : "open stages",
+            detail: openStages.count == 1 ? "One active opportunity" : "Across your active pipeline",
+            tint: WidgetPalette.blue
+          )
 
-          Text(stage.title.isEmpty ? "Stage" : stage.title)
-            .font(.headline)
-            .foregroundStyle(.white)
-            .lineLimit(3)
+          VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+              if !leadStage.company.isEmpty {
+                WidgetInfoCapsule(label: leadStage.company, tint: WidgetPalette.blue)
+              }
+              WidgetInfoCapsule(label: "Updated \(relativeTimeLabel(from: leadStage.updatedAt))", tint: WidgetPalette.subtle, usesNeutralTint: true)
+            }
 
-          Text(stage.updatedAt, style: .relative)
-            .font(.caption2)
-            .foregroundStyle(WidgetPalette.muted)
+            Text(leadStage.title.isEmpty ? "Stage in progress" : leadStage.title)
+              .font(.system(size: 17, weight: .bold, design: .rounded))
+              .foregroundStyle(WidgetPalette.primaryText)
+              .lineLimit(2)
+              .minimumScaleFactor(0.82)
+
+            if openStages.count > 1 {
+              VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(openStages.dropFirst().prefix(2)), id: \.id) { stage in
+                  WidgetMiniRow(
+                    title: stage.company.isEmpty ? stage.title : stage.company,
+                    detail: stage.title.isEmpty ? "Active opportunity" : stage.title,
+                    tint: WidgetPalette.blue
+                  )
+                }
+              }
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(12)
+          .background(WidgetPanel(tint: WidgetPalette.blue))
         }
       } else {
-        EmptyWidgetState(title: "No open stage", subtitle: "Pipeline is empty.")
+        EmptyWidgetState(title: "No open stage", subtitle: "Pipeline is empty. Open the dashboard to add or reopen an opportunity.")
       }
     }
   }
@@ -390,32 +468,44 @@ private struct UpcomingEventsCompactWidgetView: View {
   var body: some View {
     WidgetCard(
       title: "Next event",
+      symbol: "calendar",
       tint: WidgetPalette.teal,
       url: WidgetDeepLink.event(nextEvent?.id),
       generatedAt: entry.snapshot.generatedAt
     ) {
       if let event = nextEvent {
-        VStack(alignment: .leading, spacing: 8) {
-          Text(event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()))
-            .font(.system(size: 24, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(alignment: .top, spacing: 12) {
+            WidgetKeyFigure(
+              value: event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()),
+              label: event.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)),
+              detail: event.eventTypeLabel,
+              tint: WidgetPalette.teal
+            )
+
+            Spacer(minLength: 0)
+
+            if !event.location.isEmpty {
+              WidgetInfoCapsule(label: "Live", tint: WidgetPalette.teal)
+            }
+          }
+          .padding(12)
+          .background(WidgetPanel(tint: WidgetPalette.teal))
 
           Text(event.title)
-            .font(.headline)
-            .foregroundStyle(.white)
+            .font(.system(size: 19, weight: .bold, design: .rounded))
+            .foregroundStyle(WidgetPalette.primaryText)
             .lineLimit(3)
+            .minimumScaleFactor(0.84)
+            .lineSpacing(1)
 
-          Text(event.eventTypeLabel)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(WidgetPalette.subtle)
-
-          Text(event.location.isEmpty ? event.calendarName : event.location)
-            .font(.caption2)
-            .foregroundStyle(WidgetPalette.muted)
-            .lineLimit(1)
+          VStack(alignment: .leading, spacing: 6) {
+            WidgetMetaRow(icon: "calendar", text: event.isAllDay ? "All day on \(event.calendarName)" : "Starts \(relativeTimeLabel(from: event.start))")
+            WidgetMetaRow(icon: "mappin.and.ellipse", text: event.location.isEmpty ? event.calendarName : event.location)
+          }
         }
       } else {
-        EmptyWidgetState(title: "No upcoming event", subtitle: "Nothing scheduled next.")
+        EmptyWidgetState(title: "No upcoming event", subtitle: "Nothing is scheduled next. Use the app to add or sync your calendar.")
       }
     }
   }
@@ -424,86 +514,88 @@ private struct UpcomingEventsCompactWidgetView: View {
 private struct UpcomingEventsLargeWidgetView: View {
   let entry: WidgetEntry
 
-  private struct DayBucket: Identifiable {
-    let id: Date
-    let date: Date
-    let events: [WidgetEventSnapshot]
-  }
-
-  private var buckets: [DayBucket] {
+  private var buckets: [WidgetDayBucket] {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
-    let endOfWeek = calendar.date(byAdding: .day, value: 7, to: today) ?? Date().addingTimeInterval(60 * 60 * 24 * 7)
+    let endOfWeek = calendar.date(byAdding: .day, value: 4, to: today) ?? Date().addingTimeInterval(60 * 60 * 24 * 4)
 
     let upcoming = entry.snapshot.events
       .filter { $0.end >= today && $0.start < endOfWeek }
       .sorted { $0.start < $1.start }
 
-    return (0..<7).compactMap { offset in
+    return (0..<4).compactMap { offset in
       guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
       let events = upcoming.filter { calendar.isDate($0.start, inSameDayAs: date) }
-      return DayBucket(id: date, date: date, events: events)
+      return WidgetDayBucket(id: date, date: date, events: events)
     }
+  }
+
+  private var firstUpcomingEvent: WidgetEventSnapshot? {
+    buckets
+      .flatMap(\.events)
+      .sorted { $0.start < $1.start }
+      .first
   }
 
   var body: some View {
     WidgetCard(
       title: "This week",
+      symbol: "calendar.badge.clock",
       tint: WidgetPalette.teal,
       url: WidgetDeepLink.event(entry.snapshot.events.sorted { $0.start < $1.start }.first?.id),
       generatedAt: entry.snapshot.generatedAt
     ) {
       if buckets.contains(where: { !$0.events.isEmpty }) {
-        VStack(alignment: .leading, spacing: 10) {
-          ForEach(buckets) { bucket in
-            VStack(alignment: .leading, spacing: 5) {
-              HStack {
-                Text(bucket.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                  .font(.caption.weight(.bold))
-                  .foregroundStyle(.white)
-                Spacer()
-                Text("\(bucket.events.count)")
-                  .font(.caption2.weight(.bold))
-                  .foregroundStyle(WidgetPalette.subtle)
-              }
+        VStack(alignment: .leading, spacing: 12) {
+          if let firstUpcomingEvent {
+            VStack(alignment: .leading, spacing: 10) {
+              HStack(alignment: .top, spacing: 12) {
+                WidgetKeyFigure(
+                  value: "\(buckets.flatMap(\.events).count)",
+                  label: buckets.flatMap(\.events).count == 1 ? "event this week" : "events this week",
+                  detail: firstUpcomingEvent.isAllDay ? "Next event is all day" : "Next event starts \(relativeTimeLabel(from: firstUpcomingEvent.start))",
+                  tint: WidgetPalette.teal
+                )
 
-              if bucket.events.isEmpty {
-                Text("No events")
-                  .font(.caption2)
-                  .foregroundStyle(WidgetPalette.muted)
-              } else {
-                ForEach(Array(bucket.events.prefix(3)), id: \.id) { event in
-                  HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()))
-                      .font(.caption2.weight(.semibold))
-                      .foregroundStyle(WidgetPalette.subtle)
-                      .frame(width: 62, alignment: .leading)
+                Spacer(minLength: 0)
 
-                    VStack(alignment: .leading, spacing: 1) {
-                      Text(event.title)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-
-                      Text(event.location.isEmpty ? event.calendarName : event.location)
-                        .font(.caption2)
-                        .foregroundStyle(WidgetPalette.muted)
-                        .lineLimit(1)
-                    }
-                  }
-                }
-
-                if bucket.events.count > 3 {
-                  Text("+ \(bucket.events.count - 3) more")
-                    .font(.caption2)
-                    .foregroundStyle(WidgetPalette.muted)
+                VStack(alignment: .trailing, spacing: 6) {
+                  WidgetInfoCapsule(
+                    label: firstUpcomingEvent.start.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)),
+                    tint: WidgetPalette.teal
+                  )
+                  WidgetInfoCapsule(
+                    label: firstUpcomingEvent.isAllDay ? "All day" : firstUpcomingEvent.start.formatted(.dateTime.hour().minute()),
+                    tint: WidgetPalette.subtle,
+                    usesNeutralTint: true
+                  )
                 }
               }
+
+              Text(firstUpcomingEvent.title)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(WidgetPalette.primaryText)
+                .lineLimit(2)
+                .lineSpacing(1)
+
+              Text(firstUpcomingEvent.location.isEmpty ? firstUpcomingEvent.calendarName : firstUpcomingEvent.location)
+                .font(.caption)
+                .foregroundStyle(WidgetPalette.secondaryText)
+                .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(WidgetPanel(tint: WidgetPalette.teal))
+          }
+
+          VStack(alignment: .leading, spacing: 12) {
+            ForEach(buckets) { bucket in
+              WidgetAgendaDayRow(bucket: bucket)
             }
           }
         }
       } else {
-        EmptyWidgetState(title: "No upcoming events", subtitle: "Nothing scheduled this week.")
+        WeeklyEmptyWidgetState()
       }
     }
   }
@@ -511,6 +603,7 @@ private struct UpcomingEventsLargeWidgetView: View {
 
 private struct WidgetCard<Content: View>: View {
   let title: String
+  let symbol: String
   let tint: Color
   let url: URL?
   let generatedAt: Date
@@ -518,12 +611,14 @@ private struct WidgetCard<Content: View>: View {
 
   init(
     title: String,
+    symbol: String,
     tint: Color,
     url: URL?,
     generatedAt: Date,
     @ViewBuilder content: () -> Content
   ) {
     self.title = title
+    self.symbol = symbol
     self.tint = tint
     self.url = url
     self.generatedAt = generatedAt
@@ -537,18 +632,44 @@ private struct WidgetCard<Content: View>: View {
   var body: some View {
     ZStack {
       RoundedRectangle(cornerRadius: 22, style: .continuous)
-        .stroke(WidgetPalette.border, lineWidth: 1)
+        .fill(Color.white.opacity(0.012))
 
-      VStack(alignment: .leading, spacing: 12) {
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .strokeBorder(
+          LinearGradient(
+            colors: [Color.white.opacity(0.16), Color.white.opacity(0.04)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+          ),
+          lineWidth: 1
+        )
+
+      VStack(alignment: .leading, spacing: 14) {
         HStack {
-          Text(title)
-            .font(.caption.weight(.bold))
-            .foregroundStyle(.white.opacity(0.88))
+          HStack(spacing: 7) {
+            ZStack {
+              Circle()
+                .fill(tint.opacity(0.16))
+              Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tint)
+            }
+            .frame(width: 24, height: 24)
+
+            Text(title)
+              .font(.system(size: 12, weight: .semibold, design: .rounded))
+              .foregroundStyle(WidgetPalette.secondaryText)
+              .tracking(0.35)
+          }
           Spacer()
           if isStale {
             Text("STALE")
               .font(.caption2.weight(.bold))
               .foregroundStyle(tint)
+              .padding(.horizontal, 7)
+              .padding(.vertical, 3)
+              .background(tint.opacity(0.14))
+              .clipShape(Capsule())
           }
         }
 
@@ -556,11 +677,217 @@ private struct WidgetCard<Content: View>: View {
 
         Spacer(minLength: 0)
       }
-      .padding(16)
+      .padding(17)
     }
+    .shadow(color: tint.opacity(0.10), radius: 14, y: 8)
     .dashboardWidgetBackground(tint: tint)
     .widgetURL(url)
   }
+}
+
+private struct WidgetPanel: View {
+  let tint: Color
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: 16, style: .continuous)
+      .fill(
+        LinearGradient(
+          colors: [
+            Color.white.opacity(0.08),
+            tint.opacity(0.10),
+            Color.black.opacity(0.04),
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .stroke(Color.white.opacity(0.08), lineWidth: 1)
+      )
+  }
+}
+
+private struct WidgetInfoCapsule: View {
+  let label: String
+  let tint: Color
+  var usesNeutralTint: Bool = false
+
+  var body: some View {
+    Text(label)
+      .font(.caption2.weight(.bold))
+      .foregroundStyle(usesNeutralTint ? WidgetPalette.subtle : tint)
+      .lineLimit(1)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 5)
+      .background(usesNeutralTint ? WidgetPalette.surfaceStrong : tint.opacity(0.15))
+      .clipShape(Capsule())
+  }
+}
+
+private struct WidgetMetaRow: View {
+  let icon: String
+  let text: String
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 6) {
+      Image(systemName: icon)
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(WidgetPalette.subtle)
+      Text(text)
+        .font(.caption)
+        .foregroundStyle(WidgetPalette.subtle)
+        .lineLimit(2)
+        .lineSpacing(1)
+    }
+  }
+}
+
+private struct WidgetKeyFigure: View {
+  let value: String
+  let label: String
+  let detail: String
+  let tint: Color
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(value)
+        .font(.system(size: 32, weight: .bold, design: .rounded))
+        .foregroundStyle(WidgetPalette.primaryText)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .contentTransition(.numericText())
+
+      Text(label)
+        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .foregroundStyle(tint)
+        .textCase(.uppercase)
+        .tracking(0.7)
+
+      Text(detail)
+        .font(.caption2)
+        .foregroundStyle(WidgetPalette.muted)
+        .lineLimit(2)
+    }
+  }
+}
+
+private struct WidgetMiniRow: View {
+  let title: String
+  let detail: String
+  let tint: Color
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 8) {
+      Capsule()
+        .fill(tint.opacity(0.95))
+        .frame(width: 3, height: 28)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(WidgetPalette.primaryText)
+          .lineLimit(1)
+
+        Text(detail)
+          .font(.caption2)
+          .foregroundStyle(WidgetPalette.muted)
+          .lineLimit(1)
+      }
+    }
+  }
+}
+
+private struct WidgetProgressBar: View {
+  let progress: Double
+  let tint: Color
+
+  var body: some View {
+    ZStack(alignment: .leading) {
+      Capsule()
+        .fill(WidgetPalette.surfaceStrong)
+
+      Capsule()
+        .fill(
+          LinearGradient(
+            colors: [tint.opacity(0.60), tint, .white.opacity(0.95)],
+            startPoint: .leading,
+            endPoint: .trailing
+          )
+        )
+        .scaleEffect(x: max(0.06, progress), y: 1, anchor: .leading)
+    }
+    .frame(height: 8)
+    .animation(.easeOut(duration: 0.24), value: progress)
+  }
+}
+
+private struct WidgetDayBucket: Identifiable {
+  let id: Date
+  let date: Date
+  let events: [WidgetEventSnapshot]
+}
+
+private struct WidgetAgendaDayRow: View {
+  let bucket: WidgetDayBucket
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(bucket.date.formatted(.dateTime.weekday(.abbreviated)))
+          .font(.system(size: 11, weight: .bold, design: .rounded))
+          .foregroundStyle(WidgetPalette.muted)
+          .textCase(.uppercase)
+          .tracking(0.7)
+
+        Text(bucket.date.formatted(.dateTime.day()))
+          .font(.system(size: 28, weight: .bold, design: .rounded))
+          .foregroundStyle(WidgetPalette.primaryText)
+      }
+      .frame(width: 42, alignment: .leading)
+
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
+          Text(bucket.date.formatted(.dateTime.month(.abbreviated)))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(WidgetPalette.secondaryText)
+          Spacer()
+          Text(bucket.events.isEmpty ? "Free" : "\(bucket.events.count) planned")
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .foregroundStyle(bucket.events.isEmpty ? WidgetPalette.muted : WidgetPalette.teal)
+            .tracking(0.2)
+        }
+
+        if bucket.events.isEmpty {
+          Text("No events scheduled")
+            .font(.caption)
+            .foregroundStyle(WidgetPalette.muted)
+        } else {
+          VStack(alignment: .leading, spacing: 7) {
+            ForEach(Array(bucket.events.prefix(2)), id: \.id) { event in
+              WidgetMiniRow(
+                title: "\(event.isAllDay ? "All day" : event.start.formatted(.dateTime.hour().minute()))  \(event.title)",
+                detail: event.location.isEmpty ? event.calendarName : event.location,
+                tint: WidgetPalette.teal
+              )
+            }
+
+            if bucket.events.count > 2 {
+              Text("+ \(bucket.events.count - 2) more")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(WidgetPalette.subtle)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+private func relativeTimeLabel(from date: Date) -> String {
+  let formatter = RelativeDateTimeFormatter()
+  formatter.unitsStyle = .short
+  return formatter.localizedString(for: date, relativeTo: Date())
 }
 
 private struct EmptyWidgetState: View {
@@ -568,15 +895,82 @@ private struct EmptyWidgetState: View {
   let subtitle: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 10) {
       Text(title)
         .font(.headline)
-        .foregroundStyle(.white)
+        .foregroundStyle(WidgetPalette.primaryText)
 
       Text(subtitle)
         .font(.caption)
         .foregroundStyle(WidgetPalette.subtle)
         .lineLimit(3)
+
+      Text("Open app")
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.08))
+        .clipShape(Capsule())
     }
+  }
+}
+
+private struct WeeklyEmptyWidgetState: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text("Week looks clear")
+          .font(.system(size: 26, weight: .bold, design: .rounded))
+          .foregroundStyle(WidgetPalette.primaryText)
+
+        Text("No upcoming events in the next four days.")
+          .font(.subheadline)
+          .foregroundStyle(WidgetPalette.secondaryText)
+          .lineLimit(2)
+      }
+
+      HStack(spacing: 10) {
+        ForEach(0..<4, id: \.self) { offset in
+          VStack(alignment: .leading, spacing: 8) {
+            Text(dayLabel(offset: offset))
+              .font(.system(size: 11, weight: .bold, design: .rounded))
+              .foregroundStyle(WidgetPalette.muted)
+              .textCase(.uppercase)
+              .tracking(0.8)
+
+            Spacer(minLength: 0)
+
+            Circle()
+              .fill(WidgetPalette.teal.opacity(offset == 0 ? 0.85 : 0.40))
+              .frame(width: 7, height: 7)
+
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .fill(Color.white.opacity(0.08))
+              .frame(height: 3)
+
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .fill(Color.white.opacity(0.05))
+              .frame(height: 3)
+              .padding(.trailing, 10)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+          .padding(12)
+          .background(WidgetPanel(tint: WidgetPalette.teal))
+        }
+      }
+      .frame(maxHeight: .infinity)
+
+      Text("Use the free time for deep work, outreach, or recovery.")
+        .font(.caption)
+        .foregroundStyle(WidgetPalette.muted)
+        .lineLimit(2)
+    }
+  }
+
+  private func dayLabel(offset: Int) -> String {
+    let calendar = Calendar.current
+    let date = calendar.date(byAdding: .day, value: offset, to: Date()) ?? Date()
+    return date.formatted(.dateTime.weekday(.abbreviated))
   }
 }

@@ -48,8 +48,9 @@ final class ConfigStore: ObservableObject {
     let legacy = Self.loadConfig(from: LegacyPreferences.data(forKey: storageKey), decoder: decoder)
     let selected = Self.preferredConfig(current: stored, legacy: legacy)
     let migrated = Self.migratedGoogleOAuthConfig(selected)
-    self.config = migrated
-    if migrated != stored {
+    let configured = Self.appliedEnvironmentOverrides(migrated)
+    self.config = configured
+    if configured != stored {
       persist()
     }
   }
@@ -106,20 +107,35 @@ final class ConfigStore: ObservableObject {
       config.googleOAuthScopes = defaultScopes
     }
 
-    let storedClientID = config.googleOAuthClientID.trimmingCharacters(in: .whitespacesAndNewlines)
-    let storedClientSecret = config.googleOAuthClientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
     let storedRedirectURI = config.googleOAuthRedirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
-    let shouldResetOAuthSession = storedClientID != AppConfig.defaultGoogleOAuthClientID ||
-      storedClientSecret != AppConfig.defaultGoogleOAuthClientSecret ||
-      !storedRedirectURI.isEmpty
-
-    if shouldResetOAuthSession {
-      config.googleOAuthClientID = AppConfig.defaultGoogleOAuthClientID
-      config.googleOAuthClientSecret = AppConfig.defaultGoogleOAuthClientSecret
+    if !storedRedirectURI.isEmpty {
       config.googleOAuthRedirectURI = ""
       config.googleAccessToken = ""
       config.googleRefreshToken = ""
       config.googleTokenExpiration = nil
+    }
+
+    return config
+  }
+
+  private static func appliedEnvironmentOverrides(_ source: AppConfig) -> AppConfig {
+    var config = source
+    let secrets = EnvironmentSecrets.load()
+
+    let nextClientID = secrets.googleOAuthClientID ?? config.googleOAuthClientID
+    let nextClientSecret = secrets.googleOAuthClientSecret ?? config.googleOAuthClientSecret
+    let credentialsChanged = nextClientID != config.googleOAuthClientID ||
+      nextClientSecret != config.googleOAuthClientSecret
+
+    config.googleOAuthClientID = nextClientID
+    config.googleOAuthClientSecret = nextClientSecret
+
+    if credentialsChanged {
+      config.googleAccessToken = ""
+      config.googleRefreshToken = ""
+      config.googleTokenExpiration = nil
+      config.googleSelectedCalendarIDs = []
+      config.googleDefaultCalendarID = ""
     }
 
     return config
