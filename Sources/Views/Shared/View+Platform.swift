@@ -54,6 +54,20 @@ enum PerformanceMonitor {
   }
 }
 
+enum AppLogger {
+  private static let subsystem = "com.loldashboard.notiondashboard"
+
+  static let app = Logger(subsystem: subsystem, category: "app")
+  static let database = Logger(subsystem: subsystem, category: "database")
+  static let notion = Logger(subsystem: subsystem, category: "notion")
+  static let google = Logger(subsystem: subsystem, category: "google")
+  static let calendar = Logger(subsystem: subsystem, category: "calendar")
+  static let widget = Logger(subsystem: subsystem, category: "widget")
+  static let focus = Logger(subsystem: subsystem, category: "focus")
+  static let network = Logger(subsystem: subsystem, category: "network")
+  static let persistence = Logger(subsystem: subsystem, category: "persistence")
+}
+
 extension View {
   @ViewBuilder
   func plainTextInputBehavior() -> some View {

@@ -8,9 +8,17 @@ final class TodoRepository: @unchecked Sendable {
     self.appDatabase = appDatabase
   }
 
+  private func write(_ context: String, _ block: (Database) throws -> Void) {
+    do {
+      try appDatabase.dbQueue.write(block)
+    } catch {
+      NSLog("TodoRepository.\(context) write failed: \(error)")
+    }
+  }
+
   func replaceTodos(_ todos: [TodoItem]) {
     let records = todos.map(TodoRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("replaceTodos") { db in
       try db.execute(sql: "DELETE FROM \(TodoRecord.databaseTableName)")
       for var record in records {
         try record.insert(db)
@@ -25,7 +33,7 @@ final class TodoRepository: @unchecked Sendable {
   func upsertTodos(_ todos: [TodoItem]) {
     guard !todos.isEmpty else { return }
     let records = todos.map(TodoRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("upsertTodos") { db in
       for var record in records {
         try record.save(db)
       }
@@ -38,7 +46,7 @@ final class TodoRepository: @unchecked Sendable {
 
   func deleteTodos(ids: Set<String>) {
     guard !ids.isEmpty else { return }
-    try? appDatabase.dbQueue.write { db in
+    write("deleteTodos") { db in
       let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ", ")
       try db.execute(
         sql: "DELETE FROM \(TodoRecord.databaseTableName) WHERE id IN (\(placeholders))",

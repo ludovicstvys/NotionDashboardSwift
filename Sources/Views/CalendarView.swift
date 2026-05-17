@@ -365,6 +365,7 @@ struct CalendarView: View {
             Image(systemName: "chevron.left")
           }
           .buttonStyle(.bordered)
+          .accessibilityLabel("Previous day")
 
           Button("Today") {
             selectedDay = Calendar.current.startOfDay(for: Date())
@@ -377,6 +378,7 @@ struct CalendarView: View {
           } label: {
             Image(systemName: "chevron.right")
           }
+          .accessibilityLabel("Next day")
           .buttonStyle(.bordered)
         }
       }

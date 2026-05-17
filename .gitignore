@@ -18,4 +18,7 @@ NotionDashboardSwift.xcodeproj/xcuserdata/
 .agents/
 .codex/
 AGENTS.md
+# Local secrets — never commit. Keep .env.example tracked as template.
 .env
+.env.*
+!.env.example

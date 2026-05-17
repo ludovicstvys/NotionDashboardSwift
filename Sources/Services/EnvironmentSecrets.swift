@@ -20,7 +20,18 @@ struct EnvironmentSecrets {
     )
   }
 
+  private static let dotEnvCacheLock = NSLock()
+  private static var cachedDotEnvValues: [String: String]?
+
   private static func loadDotEnvValues() -> [String: String] {
+    dotEnvCacheLock.lock()
+    if let cached = cachedDotEnvValues {
+      dotEnvCacheLock.unlock()
+      return cached
+    }
+    dotEnvCacheLock.unlock()
+
+    var resolved: [String: String] = [:]
     for url in candidateDotEnvURLs() {
       guard
         let data = try? Data(contentsOf: url),
@@ -28,9 +39,14 @@ struct EnvironmentSecrets {
       else {
         continue
       }
-      return parseDotEnv(text)
+      resolved = parseDotEnv(text)
+      break
     }
-    return [:]
+
+    dotEnvCacheLock.lock()
+    cachedDotEnvValues = resolved
+    dotEnvCacheLock.unlock()
+    return resolved
   }
 
   private static func candidateDotEnvURLs() -> [URL] {

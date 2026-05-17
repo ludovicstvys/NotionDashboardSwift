@@ -1,6 +1,10 @@
 import Foundation
 import Network
 
+// Localhost-only HTTP control surface for the Focus/Pomodoro browser extension companion.
+// Threat model: binds 127.0.0.1 only (no LAN exposure), no auth — relies on loopback isolation.
+// CORS headers are permissive because only same-host clients (browser extension) can reach it.
+// Do NOT bind to 0.0.0.0 or add LAN discovery without introducing token auth.
 @MainActor
 final class FocusLocalServer {
   static let port: UInt16 = 49172
@@ -29,6 +33,10 @@ final class FocusLocalServer {
       let port = NWEndpoint.Port(integerLiteral: NWEndpoint.Port.IntegerLiteralType(Self.port))
       let listener = try NWListener(using: params, on: port)
       listener.newConnectionHandler = { [weak self] connection in
+        guard FocusLocalServer.isLoopback(endpoint: connection.currentPath?.remoteEndpoint) else {
+          connection.cancel()
+          return
+        }
         Task { @MainActor [weak self] in
           self?.handle(connection: connection)
         }
@@ -48,6 +56,23 @@ final class FocusLocalServer {
         metadata: ["error": error.localizedDescription]
       )
     }
+  }
+
+  nonisolated private static func isLoopback(endpoint: NWEndpoint?) -> Bool {
+    guard let endpoint else { return true }
+    if case let .hostPort(host, _) = endpoint {
+      switch host {
+      case .ipv4(let addr):
+        return addr.isLoopback
+      case .ipv6(let addr):
+        return addr.isLoopback
+      case .name(let name, _):
+        return name == "localhost" || name == "127.0.0.1" || name == "::1"
+      @unknown default:
+        return false
+      }
+    }
+    return false
   }
 
   private func handle(listenerState state: NWListener.State) {

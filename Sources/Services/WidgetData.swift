@@ -104,9 +104,15 @@ enum WidgetSnapshotStore {
   }
 
   static func save(_ snapshot: DashboardWidgetSnapshot) {
-    guard let data = encode(snapshot) else { return }
-    if let url = snapshotURL() {
-      try? data.write(to: url)
+    guard let data = encode(snapshot) else {
+      NSLog("DashboardWidgetSnapshotStore: encode failed")
+      return
+    }
+    guard let url = snapshotURL() else { return }
+    do {
+      try data.write(to: url)
+    } catch {
+      NSLog("DashboardWidgetSnapshotStore: write failed at \(url.path): \(error)")
     }
   }
 
@@ -129,9 +135,15 @@ enum FocusWidgetSnapshotStore {
   }
 
   static func save(_ snapshot: WidgetFocusSnapshot) {
-    guard let data = encode(snapshot) else { return }
-    if let url = snapshotURL() {
-      try? data.write(to: url)
+    guard let data = encode(snapshot) else {
+      NSLog("FocusWidgetSnapshotStore: encode failed")
+      return
+    }
+    guard let url = snapshotURL() else { return }
+    do {
+      try data.write(to: url)
+    } catch {
+      NSLog("FocusWidgetSnapshotStore: write failed at \(url.path): \(error)")
     }
   }
 
@@ -161,7 +173,11 @@ private enum WidgetSharedContainer {
       .containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)?
       .appendingPathComponent(directoryName, isDirectory: true) else { return nil }
 #endif
-    try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    do {
+      try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    } catch {
+      NSLog("WidgetSharedContainer: createDirectory failed at \(directoryURL.path): \(error)")
+    }
     return directoryURL.appendingPathComponent(fileName)
   }
 
@@ -177,7 +193,12 @@ private func encode<T: Encodable>(_ value: T) -> Data? {
   let encoder = JSONEncoder()
   encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
   encoder.dateEncodingStrategy = .iso8601
-  return try? encoder.encode(value)
+  do {
+    return try encoder.encode(value)
+  } catch {
+    NSLog("WidgetData.encode failed for \(T.self): \(error)")
+    return nil
+  }
 }
 
 private func decode<T: Decodable>(_ type: T.Type, from data: Data) -> T? {

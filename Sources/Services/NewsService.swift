@@ -1,13 +1,20 @@
 import Foundation
 
 struct NewsService {
+  private static let feedURLString = "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US"
+
+  let client: APIClient
+
+  init(client: APIClient = APIClient()) {
+    self.client = client
+  }
+
   func fetchTopNews(limit: Int = 20) async throws -> [NewsItem] {
-    let url = URL(string: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US")!
-    let (data, response) = try await URLSession.shared.data(from: url)
-    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-      throw URLError(.badServerResponse)
+    guard let url = URL(string: Self.feedURLString) else {
+      throw APIClientError.invalidURL
     }
-    return NewsRSSParser.parse(data: data).prefix(limit).map { $0 }
+    let (data, _) = try await client.send(APIRequest(url: url))
+    return Array(NewsRSSParser.parse(data: data).prefix(limit))
   }
 }
 

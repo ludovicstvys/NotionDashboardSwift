@@ -1167,6 +1167,15 @@ private struct TodoEditorView: View {
           .buttonStyle(.borderedProminent)
           .tint(WorkspacePalette.accent)
 
+          if !todo.resolvedNotionURL.isEmpty {
+            ProtectedLinkButton(
+              title: "Open in Notion",
+              systemImage: "arrow.up.right.square",
+              urlString: todo.resolvedNotionURL,
+              tint: WorkspacePalette.accentSoft
+            )
+          }
+
           if allowsDelete {
             Button(role: .destructive) {
               onDelete()

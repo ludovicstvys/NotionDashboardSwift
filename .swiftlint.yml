@@ -1,0 +1,66 @@
+included:
+  - Sources
+
+excluded:
+  - build
+  - .build
+  - DerivedData
+  - NotionDashboardSwift.xcodeproj
+  - packaging
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - last_where
+  - sorted_first_last
+  - toggle_bool
+  - unused_import
+  - redundant_nil_coalescing
+  - closure_spacing
+  - operator_usage_whitespace
+
+disabled_rules:
+  - trailing_comma
+  - todo
+  - line_length
+
+force_cast: error
+force_try: error
+force_unwrapping: error
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - x
+    - y
+    - i
+    - n
+
+type_name:
+  min_length: 3
+  max_length:
+    warning: 50
+    error: 60
+
+function_body_length:
+  warning: 80
+  error: 150
+
+type_body_length:
+  warning: 400
+  error: 800
+
+file_length:
+  warning: 800
+  error: 2000
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level: 3
+  function_level: 5

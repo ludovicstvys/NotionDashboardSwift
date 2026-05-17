@@ -1,17 +1,22 @@
 import Foundation
 
 struct MarketService {
+  let client: APIClient
+
+  init(client: APIClient = APIClient()) {
+    self.client = client
+  }
+
   func fetchQuotes(symbols: [String]) async throws -> [MarketQuote] {
     guard !symbols.isEmpty else { return [] }
     let joined = symbols.joined(separator: ",")
-    var components = URLComponents(string: "https://query1.finance.yahoo.com/v7/finance/quote")
-    components?.queryItems = [.init(name: "symbols", value: joined)]
-    guard let url = components?.url else { return [] }
-
-    let (data, response) = try await URLSession.shared.data(from: url)
-    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-      throw URLError(.badServerResponse)
+    guard var components = URLComponents(string: "https://query1.finance.yahoo.com/v7/finance/quote") else {
+      return []
     }
+    components.queryItems = [.init(name: "symbols", value: joined)]
+    guard let url = components.url else { return [] }
+
+    let (data, _) = try await client.send(APIRequest(url: url))
 
     guard
       let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],

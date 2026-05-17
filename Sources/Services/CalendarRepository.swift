@@ -24,9 +24,17 @@ final class CalendarRepository: @unchecked Sendable {
     self.appDatabase = appDatabase
   }
 
+  private func write(_ context: String, _ block: (Database) throws -> Void) {
+    do {
+      try appDatabase.dbQueue.write(block)
+    } catch {
+      NSLog("CalendarRepository.\(context) write failed: \(error)")
+    }
+  }
+
   func replaceEvents(_ events: [CalendarEvent]) {
     let records = events.map(CalendarEventRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("replaceEvents") { db in
       try db.execute(sql: "DELETE FROM \(CalendarEventRecord.databaseTableName)")
       for var record in records {
         try record.insert(db)
@@ -37,7 +45,7 @@ final class CalendarRepository: @unchecked Sendable {
   func upsertEvents(_ events: [CalendarEvent]) {
     guard !events.isEmpty else { return }
     let records = events.map(CalendarEventRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("upsertEvents") { db in
       for var record in records {
         try record.save(db)
       }
@@ -46,7 +54,7 @@ final class CalendarRepository: @unchecked Sendable {
 
   func deleteEvents(ids: Set<String>) {
     guard !ids.isEmpty else { return }
-    try? appDatabase.dbQueue.write { db in
+    write("deleteEvents") { db in
       let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ", ")
       try db.execute(
         sql: "DELETE FROM \(CalendarEventRecord.databaseTableName) WHERE id IN (\(placeholders))",
@@ -57,7 +65,7 @@ final class CalendarRepository: @unchecked Sendable {
 
   func replaceEvents(inRange range: DateInterval, with events: [CalendarEvent]) {
     let records = events.map(CalendarEventRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("replaceEvents(inRange:)") { db in
       try db.execute(
         sql: """
         DELETE FROM \(CalendarEventRecord.databaseTableName)

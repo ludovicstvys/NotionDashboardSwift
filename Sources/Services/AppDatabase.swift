@@ -76,6 +76,7 @@ struct TodoRecord: Codable, FetchableRecord, MutablePersistableRecord, TableReco
   var relatedStageID: String
   var automationTag: String
   var createdAt: Date
+  var notionURL: String
 
   init(todo: TodoItem) {
     self.id = todo.id
@@ -86,6 +87,7 @@ struct TodoRecord: Codable, FetchableRecord, MutablePersistableRecord, TableReco
     self.relatedStageID = todo.relatedStageID
     self.automationTag = todo.automationTag
     self.createdAt = todo.createdAt
+    self.notionURL = todo.notionURL
   }
 
   func makeTodo() -> TodoItem {
@@ -97,7 +99,8 @@ struct TodoRecord: Codable, FetchableRecord, MutablePersistableRecord, TableReco
       notes: notes,
       relatedStageID: relatedStageID,
       automationTag: automationTag,
-      createdAt: createdAt
+      createdAt: createdAt,
+      notionURL: notionURL
     )
   }
 }
@@ -168,10 +171,25 @@ final class AppDatabase: @unchecked Sendable {
   let dbQueue: DatabaseQueue
 
   init() {
-    self.dbQueue = try! DatabaseQueue(path: AppDatabase.databaseURL.path)
-    try! migrator.migrate(dbQueue)
+    let path = AppDatabase.databaseURL.path
+    do {
+      self.dbQueue = try DatabaseQueue(path: path)
+    } catch {
+      NSLog("AppDatabase: failed to open database at \(path): \(error)")
+      fatalError("AppDatabase open failed at \(path): \(error)")
+    }
+    do {
+      try migrator.migrate(dbQueue)
+    } catch {
+      NSLog("AppDatabase: migration failed: \(error)")
+      fatalError("AppDatabase migration failed: \(error)")
+    }
   }
 
+  // Migration order is IMMUTABLE once shipped.
+  // - Never reorder, rename, or remove a registered migration.
+  // - New schema changes go in a new `registerMigration("addXxxVN")` block at the bottom.
+  // - Destructive ALTERs (drop column, change type) require a copy-into-new-table pattern.
   private var migrator: DatabaseMigrator {
     var migrator = DatabaseMigrator()
 
@@ -249,6 +267,12 @@ final class AppDatabase: @unchecked Sendable {
       INSERT INTO stages_fts(stageID, searchableText)
       SELECT id, searchableText FROM \(StageRecord.databaseTableName)
       """)
+    }
+
+    migrator.registerMigration("addTodoNotionURLV4") { db in
+      try db.alter(table: TodoRecord.databaseTableName) { table in
+        table.add(column: "notionURL", .text).notNull().defaults(to: "")
+      }
     }
 
     return migrator

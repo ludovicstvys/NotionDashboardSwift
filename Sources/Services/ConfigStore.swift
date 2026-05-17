@@ -1,5 +1,76 @@
 import Foundation
+import Security
 import SwiftUI
+
+// Keychain-backed secret store. Secrets never appear in JSON/UserDefaults.
+// Service = bundle id; account = field name.
+enum SecureKeychain {
+  static let service = "com.loldashboard.notiondashboard.credentials"
+
+  enum Account: String, CaseIterable {
+    case notionToken
+    case googleAccessToken
+    case googleRefreshToken
+    case googleOAuthClientSecret
+  }
+
+  static func read(_ account: Account) -> String? {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account.rawValue,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+      kSecReturnData as String: true,
+    ]
+    var item: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &item)
+    guard status == errSecSuccess, let data = item as? Data, let value = String(data: data, encoding: .utf8) else {
+      return nil
+    }
+    return value
+  }
+
+  @discardableResult
+  static func write(_ account: Account, value: String) -> Bool {
+    let data = Data(value.utf8)
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account.rawValue,
+    ]
+    let attributes: [String: Any] = [
+      kSecValueData as String: data,
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+    ]
+    let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    if updateStatus == errSecSuccess {
+      return true
+    }
+    if updateStatus == errSecItemNotFound {
+      var addQuery = query
+      for (k, v) in attributes { addQuery[k] = v }
+      let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+      if addStatus != errSecSuccess {
+        NSLog("SecureKeychain.write \(account.rawValue) failed: OSStatus \(addStatus)")
+        return false
+      }
+      return true
+    }
+    NSLog("SecureKeychain.write \(account.rawValue) update failed: OSStatus \(updateStatus)")
+    return false
+  }
+
+  @discardableResult
+  static func delete(_ account: Account) -> Bool {
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account.rawValue,
+    ]
+    let status = SecItemDelete(query as CFDictionary)
+    return status == errSecSuccess || status == errSecItemNotFound
+  }
+}
 
 enum ConfigStoreError: LocalizedError {
   case invalidText
@@ -48,11 +119,11 @@ final class ConfigStore: ObservableObject {
     let legacy = Self.loadConfig(from: LegacyPreferences.data(forKey: storageKey), decoder: decoder)
     let selected = Self.preferredConfig(current: stored, legacy: legacy)
     let migrated = Self.migratedGoogleOAuthConfig(selected)
-    let configured = Self.appliedEnvironmentOverrides(migrated)
+    let secretsApplied = Self.overlaySecretsFromKeychain(migrated)
+    let configured = Self.appliedEnvironmentOverrides(secretsApplied)
     self.config = configured
-    if configured != stored {
-      persist()
-    }
+    // Always persist after init: migrates plaintext tokens to Keychain + strips JSON.
+    persist()
   }
 
   func update(_ mutate: (inout AppConfig) -> Void) {
@@ -66,8 +137,29 @@ final class ConfigStore: ObservableObject {
       let data = defaults.data(forKey: storageKey),
       let loaded = try? decoder.decode(AppConfig.self, from: data)
     {
-      config = Self.migratedGoogleOAuthConfig(loaded)
+      let migrated = Self.migratedGoogleOAuthConfig(loaded)
+      config = Self.overlaySecretsFromKeychain(migrated)
     }
+  }
+
+  // Reads each sensitive field from Keychain. If Keychain empty but AppConfig has plaintext
+  // (legacy from UserDefaults), the existing AppConfig value is preserved so subsequent
+  // persist() migrates it to Keychain.
+  private static func overlaySecretsFromKeychain(_ source: AppConfig) -> AppConfig {
+    var config = source
+    if let value = SecureKeychain.read(.notionToken), !value.isEmpty {
+      config.notionToken = value
+    }
+    if let value = SecureKeychain.read(.googleAccessToken), !value.isEmpty {
+      config.googleAccessToken = value
+    }
+    if let value = SecureKeychain.read(.googleRefreshToken), !value.isEmpty {
+      config.googleRefreshToken = value
+    }
+    if let value = SecureKeychain.read(.googleOAuthClientSecret), !value.isEmpty {
+      config.googleOAuthClientSecret = value
+    }
+    return config
   }
 
   func exportConnectionsText() throws -> String {
@@ -170,13 +262,42 @@ final class ConfigStore: ObservableObject {
     let storageKey = self.storageKey
     persistenceScheduler.schedule {
       let start = CFAbsoluteTimeGetCurrent()
+
+      // Write secrets to Keychain. Empty values delete the entry so disconnect clears state.
+      Self.persistSecret(.notionToken, value: config.notionToken)
+      Self.persistSecret(.googleAccessToken, value: config.googleAccessToken)
+      Self.persistSecret(.googleRefreshToken, value: config.googleRefreshToken)
+      Self.persistSecret(.googleOAuthClientSecret, value: config.googleOAuthClientSecret)
+
+      // Sanitize copy: strip secrets before JSON serialization.
+      var sanitized = config
+      sanitized.notionToken = ""
+      sanitized.googleAccessToken = ""
+      sanitized.googleRefreshToken = ""
+      sanitized.googleOAuthClientSecret = ""
+
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
       encoder.dateEncodingStrategy = .iso8601
-      guard let data = try? encoder.encode(config) else { return }
+      let data: Data
+      do {
+        data = try encoder.encode(sanitized)
+      } catch {
+        NSLog("ConfigStore.persist encode failed: \(error)")
+        return
+      }
       defaults.set(data, forKey: storageKey)
       let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1_000
       PerformanceMonitor.recordPersistence(label: "ConfigStore.persist", durationMs: durationMs)
+    }
+  }
+
+  private static func persistSecret(_ account: SecureKeychain.Account, value: String) {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      SecureKeychain.delete(account)
+    } else {
+      SecureKeychain.write(account, value: value)
     }
   }
 }

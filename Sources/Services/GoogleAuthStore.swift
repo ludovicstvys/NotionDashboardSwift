@@ -282,7 +282,10 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     redirectURI: String,
     codeVerifier: String
   ) async throws -> GoogleTokenResponse {
-    var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
+    guard let tokenURL = URL(string: "https://oauth2.googleapis.com/token") else {
+      throw GoogleAuthError.unableToBuildURL
+    }
+    var request = URLRequest(url: tokenURL)
     request.httpMethod = "POST"
     request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     let params = [
@@ -300,7 +303,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
       .joined(separator: "&")
       .data(using: .utf8)
 
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await URLSession.app.data(for: request)
     guard let http = response as? HTTPURLResponse else {
       throw GoogleAuthError.tokenExchangeFailed("Invalid HTTP response.")
     }
@@ -321,7 +324,10 @@ final class GoogleAuthStore: NSObject, ObservableObject {
     let cleanClientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
     let cleanClientSecret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !cleanClientID.isEmpty, !cleanClientSecret.isEmpty else { throw GoogleAuthError.missingConfiguration }
-    var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
+    guard let tokenURL = URL(string: "https://oauth2.googleapis.com/token") else {
+      throw GoogleAuthError.unableToBuildURL
+    }
+    var request = URLRequest(url: tokenURL)
     request.httpMethod = "POST"
     request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     let params = [
@@ -337,7 +343,7 @@ final class GoogleAuthStore: NSObject, ObservableObject {
       .joined(separator: "&")
       .data(using: .utf8)
 
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await URLSession.app.data(for: request)
     guard let http = response as? HTTPURLResponse else {
       throw GoogleAuthError.tokenExchangeFailed("Invalid HTTP response.")
     }

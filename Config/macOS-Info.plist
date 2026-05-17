@@ -40,7 +40,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://ludovicstvys.github.io/NotionDashboardSwift/appcast.xml</string>
+	<string>$(SPARKLE_FEED_URL)</string>
 	<key>SUPublicEDKey</key>
 	<string>$(SPARKLE_PUBLIC_ED_KEY)</string>
 	<key>SURequireSignedFeed</key>
@@ -48,6 +48,6 @@
 	<key>SUScheduledCheckInterval</key>
 	<integer>3600</integer>
 	<key>UpdateChannel</key>
-	<string>dev</string>
+	<string>$(UPDATE_CHANNEL)</string>
 </dict>
 </plist>

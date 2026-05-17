@@ -30,7 +30,13 @@ enum StageStoreCache {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     encoder.dateEncodingStrategy = .iso8601
-    guard let data = try? encoder.encode(snapshot) else { return }
+    let data: Data
+    do {
+      data = try encoder.encode(snapshot)
+    } catch {
+      NSLog("StageStoreCache: encode failed: \(error)")
+      return
+    }
     do {
       try FileManager.default.createDirectory(
         at: url.deletingLastPathComponent(),
@@ -38,6 +44,7 @@ enum StageStoreCache {
       )
       try data.write(to: url, options: .atomic)
     } catch {
+      NSLog("StageStoreCache.save failed at \(url.path): \(error)")
       PerformanceMonitor.recordPersistence(label: "StageStoreCache.save.error", durationMs: 0)
     }
   }

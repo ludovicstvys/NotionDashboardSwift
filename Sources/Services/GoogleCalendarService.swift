@@ -16,6 +16,11 @@ enum GoogleCalendarError: LocalizedError {
 
 struct GoogleCalendarService {
   private let baseURL = "https://www.googleapis.com/calendar/v3"
+  let client: APIClient
+
+  init(client: APIClient = APIClient()) {
+    self.client = client
+  }
 
   func listCalendars(accessToken: String) async throws -> [GoogleCalendarDescriptor] {
     let response = try await request(path: "users/me/calendarList", accessToken: accessToken)
@@ -78,27 +83,23 @@ struct GoogleCalendarService {
     guard let url = URL(string: "\(baseURL)/calendars/\(calendarID.urlPathEncoded)/events") else {
       throw GoogleCalendarError.invalidResponse
     }
-    var req = URLRequest(url: url)
-    req.httpMethod = "POST"
-    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
-    let payload: [String: Any] = [
-      "summary": summary,
-      "location": location,
-      "description": description,
-      "start": ["dateTime": start.iso8601String],
-      "end": ["dateTime": end.iso8601String],
-    ]
-    req.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
-    let (data, response) = try await URLSession.shared.data(for: req)
-    guard let http = response as? HTTPURLResponse else {
-      throw GoogleCalendarError.invalidResponse
-    }
-    if !(200...299).contains(http.statusCode) {
-      let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-      throw GoogleCalendarError.requestFailed(message)
-    }
+    let body = try JSONSerialization.data(withJSONObject: eventPayload(
+      summary: summary,
+      location: location,
+      description: description,
+      start: start,
+      end: end
+    ), options: [])
+    let request = APIRequest(
+      method: "POST",
+      url: url,
+      headers: [
+        "Authorization": "Bearer \(accessToken)",
+        "Content-Type": "application/json",
+      ],
+      body: body
+    )
+    let (data, _) = try await mapped { try await client.send(request) }
     guard
       let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
       let id = object["id"] as? String
@@ -121,28 +122,35 @@ struct GoogleCalendarService {
     guard let url = URL(string: "\(baseURL)/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)") else {
       throw GoogleCalendarError.invalidResponse
     }
-    var req = URLRequest(url: url)
-    req.httpMethod = "PATCH"
-    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-    req.httpBody = try JSONSerialization.data(withJSONObject: eventPayload(
+    let body = try JSONSerialization.data(withJSONObject: eventPayload(
       summary: summary,
       location: location,
       description: description,
       start: start,
       end: end
     ), options: [])
-    try await sendMutation(req)
+    let request = APIRequest(
+      method: "PATCH",
+      url: url,
+      headers: [
+        "Authorization": "Bearer \(accessToken)",
+        "Content-Type": "application/json",
+      ],
+      body: body
+    )
+    _ = try await mapped { try await client.send(request) }
   }
 
   func deleteEvent(accessToken: String, calendarID: String, eventID: String) async throws {
     guard let url = URL(string: "\(baseURL)/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)") else {
       throw GoogleCalendarError.invalidResponse
     }
-    var req = URLRequest(url: url)
-    req.httpMethod = "DELETE"
-    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    try await sendMutation(req, acceptsEmptyResponse: true)
+    let request = APIRequest(
+      method: "DELETE",
+      url: url,
+      headers: ["Authorization": "Bearer \(accessToken)"]
+    )
+    _ = try await mapped { try await client.send(request) }
   }
 
   private func request(
@@ -150,29 +158,44 @@ struct GoogleCalendarService {
     queryItems: [URLQueryItem] = [],
     accessToken: String
   ) async throws -> [String: Any] {
-    var components = URLComponents(string: "\(baseURL)/\(path)")
+    guard var components = URLComponents(string: "\(baseURL)/\(path)") else {
+      throw GoogleCalendarError.invalidResponse
+    }
     if !queryItems.isEmpty {
-      components?.queryItems = queryItems
+      components.queryItems = queryItems
     }
-    guard let url = components?.url else {
+    guard let url = components.url else {
       throw GoogleCalendarError.invalidResponse
     }
-    var req = URLRequest(url: url)
-    req.httpMethod = "GET"
-    req.addValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    req.addValue("application/json", forHTTPHeaderField: "Accept")
-    let (data, response) = try await URLSession.shared.data(for: req)
-    guard let http = response as? HTTPURLResponse else {
-      throw GoogleCalendarError.invalidResponse
-    }
-    if !(200...299).contains(http.statusCode) {
-      let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-      throw GoogleCalendarError.requestFailed(message)
-    }
+    let apiRequest = APIRequest(
+      method: "GET",
+      url: url,
+      headers: [
+        "Authorization": "Bearer \(accessToken)",
+        "Accept": "application/json",
+      ]
+    )
+    let (data, _) = try await mapped { try await client.send(apiRequest) }
     guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
       throw GoogleCalendarError.invalidResponse
     }
     return object
+  }
+
+  // Translates APIClientError → GoogleCalendarError to preserve call-site semantics.
+  private func mapped<T>(_ block: () async throws -> T) async throws -> T {
+    do {
+      return try await block()
+    } catch let error as APIClientError {
+      switch error {
+      case let .httpStatus(_, body), let .rateLimited(_, body), let .unauthorized(body):
+        throw GoogleCalendarError.requestFailed(body)
+      case .invalidURL, .invalidResponse, .decoding, .retryExhausted:
+        throw GoogleCalendarError.invalidResponse
+      case let .network(inner):
+        throw GoogleCalendarError.requestFailed(inner.localizedDescription)
+      }
+    }
   }
 
   private func eventPayload(
@@ -189,20 +212,6 @@ struct GoogleCalendarService {
       "start": ["dateTime": start.iso8601String],
       "end": ["dateTime": end.iso8601String],
     ]
-  }
-
-  private func sendMutation(_ req: URLRequest, acceptsEmptyResponse: Bool = false) async throws {
-    let (data, response) = try await URLSession.shared.data(for: req)
-    guard let http = response as? HTTPURLResponse else {
-      throw GoogleCalendarError.invalidResponse
-    }
-    if !(200...299).contains(http.statusCode) {
-      let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-      throw GoogleCalendarError.requestFailed(message)
-    }
-    if !acceptsEmptyResponse, data.isEmpty {
-      throw GoogleCalendarError.invalidResponse
-    }
   }
 
   private func parseEvent(item: [String: Any], calendarNameFallback: String) -> CalendarEvent? {

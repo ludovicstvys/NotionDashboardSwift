@@ -40,9 +40,17 @@ final class StageRepository: @unchecked Sendable {
     self.appDatabase = appDatabase
   }
 
+  private func write(_ context: String, _ block: (Database) throws -> Void) {
+    do {
+      try appDatabase.dbQueue.write(block)
+    } catch {
+      NSLog("StageRepository.\(context) write failed: \(error)")
+    }
+  }
+
   func replaceStages(_ stages: [Stage]) {
     let records = stages.map(StageRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("replaceStages") { db in
       try db.execute(sql: "DELETE FROM \(StageRecord.databaseTableName)")
       for var record in records {
         try record.insert(db)
@@ -58,7 +66,7 @@ final class StageRepository: @unchecked Sendable {
   func upsertStages(_ stages: [Stage]) {
     guard !stages.isEmpty else { return }
     let records = stages.map(StageRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("upsertStages") { db in
       for var record in records {
         try record.save(db)
       }
@@ -72,7 +80,7 @@ final class StageRepository: @unchecked Sendable {
 
   func deleteStages(ids: Set<String>) {
     guard !ids.isEmpty else { return }
-    try? appDatabase.dbQueue.write { db in
+    write("deleteStages") { db in
       let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ", ")
       let arguments = StatementArguments(ids.map { $0 })
       try db.execute(
@@ -85,7 +93,7 @@ final class StageRepository: @unchecked Sendable {
 
   func replaceTodos(_ todos: [TodoItem]) {
     let records = todos.map(TodoRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("replaceTodos") { db in
       try db.execute(sql: "DELETE FROM \(TodoRecord.databaseTableName)")
       for var record in records {
         try record.insert(db)
@@ -96,7 +104,7 @@ final class StageRepository: @unchecked Sendable {
   func upsertTodos(_ todos: [TodoItem]) {
     guard !todos.isEmpty else { return }
     let records = todos.map(TodoRecord.init)
-    try? appDatabase.dbQueue.write { db in
+    write("upsertTodos") { db in
       for var record in records {
         try record.save(db)
       }
@@ -105,7 +113,7 @@ final class StageRepository: @unchecked Sendable {
 
   func deleteTodos(ids: Set<String>) {
     guard !ids.isEmpty else { return }
-    try? appDatabase.dbQueue.write { db in
+    write("deleteTodos") { db in
       let placeholders = Array(repeating: "?", count: ids.count).joined(separator: ", ")
       try db.execute(
         sql: "DELETE FROM \(TodoRecord.databaseTableName) WHERE id IN (\(placeholders))",

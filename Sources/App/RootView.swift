@@ -13,10 +13,14 @@ struct RootView: View {
       NavigationSplitView {
         sidebar
       } detail: {
-        ZStack {
+        ZStack(alignment: .top) {
           detailContainer
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .transition(.opacity.combined(with: .scale(scale: 0.995)))
+
+          UpdateBanner(updateStore: updateStore)
+            .zIndex(10)
+            .animation(.snappy(duration: 0.28), value: updateStore.availableUpdate?.id)
         }
         .animation(.snappy(duration: 0.24), value: appRouter.destination)
       }

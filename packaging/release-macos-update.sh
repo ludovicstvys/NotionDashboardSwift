@@ -71,11 +71,26 @@ source_env_file "${SIGNING_ENV_PATH}"
 
 resolve_repository_context
 
-log "building signed macOS DMG"
+UPDATE_CHANNEL_BUILD="${UPDATE_CHANNEL:-dev}"
+case "${UPDATE_CHANNEL_BUILD}" in
+  dev)
+    SPARKLE_FEED_URL_BUILD="${SPARKLE_FEED_URL:-https://${REPO_OWNER}.github.io/${REPO_NAME}/appcast.xml}"
+    ;;
+  stable)
+    SPARKLE_FEED_URL_BUILD="${SPARKLE_FEED_URL:-https://${REPO_OWNER}.github.io/${REPO_NAME}/appcast-stable.xml}"
+    ;;
+  *)
+    SPARKLE_FEED_URL_BUILD="${SPARKLE_FEED_URL:-https://${REPO_OWNER}.github.io/${REPO_NAME}/appcast-${UPDATE_CHANNEL_BUILD}.xml}"
+    ;;
+esac
+
+log "building signed macOS DMG for channel ${UPDATE_CHANNEL_BUILD}"
 ENABLE_CODE_SIGNING=1 \
 APPLE_TEAM_ID="${APPLE_TEAM_ID}" \
 APPLE_CODESIGN_IDENTITY="${APPLE_CODESIGN_IDENTITY_RESOLVED}" \
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY}" \
+UPDATE_CHANNEL="${UPDATE_CHANNEL_BUILD}" \
+SPARKLE_FEED_URL="${SPARKLE_FEED_URL_BUILD}" \
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH}" \
 APP_PRODUCT_NAME="${APP_PRODUCT_NAME}" \
 CURRENT_PROJECT_VERSION_OVERRIDE="${CURRENT_PROJECT_VERSION_OVERRIDE:-}" \
@@ -106,7 +121,21 @@ APP_PLIST="${APP_PATH}/Contents/Info.plist"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP_PLIST}")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${APP_PLIST}")"
 MIN_SYSTEM="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${APP_PLIST}")"
-TAG="v${VERSION}-dev.${BUILD}"
+UPDATE_CHANNEL="${UPDATE_CHANNEL:-dev}"
+case "${UPDATE_CHANNEL}" in
+  dev)
+    TAG="v${VERSION}-dev.${BUILD}"
+    APPCAST_FILENAME="appcast.xml"
+    ;;
+  stable)
+    TAG="v${VERSION}"
+    APPCAST_FILENAME="appcast-stable.xml"
+    ;;
+  *)
+    TAG="v${VERSION}-${UPDATE_CHANNEL}.${BUILD}"
+    APPCAST_FILENAME="appcast-${UPDATE_CHANNEL}.xml"
+    ;;
+esac
 ASSET_NAME="${APP_PRODUCT_NAME}-${VERSION}-${BUILD}.dmg"
 PAGES_BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
 RELEASE_NOTES_FILENAME="${APP_PRODUCT_NAME}-${VERSION}-${BUILD}.html"
@@ -123,7 +152,7 @@ mkdir -p "${RELEASE_ASSETS_DIR}" "${UPDATE_SITE_DIR}/releases" "${UPDATE_SITE_DI
 cp "${DMG_PATH}" "${RELEASE_ASSETS_DIR}/${ASSET_NAME}"
 cp "${RELEASE_ASSETS_DIR}/${ASSET_NAME}" "${UPDATE_SITE_DIR}/appcast-input/${ASSET_NAME}"
 
-UPDATE_CHANNEL=dev \
+UPDATE_CHANNEL="${UPDATE_CHANNEL}" \
 UPDATE_VERSION="${VERSION}" \
 UPDATE_BUILD="${BUILD}" \
 UPDATE_MINIMUM_SYSTEM_VERSION="${MIN_SYSTEM}" \
@@ -134,12 +163,18 @@ UPDATE_COMMIT_SHA="${COMMIT_SHA}" \
 UPDATE_COMMIT_MESSAGE="${COMMIT_MESSAGE}" \
 "${ROOT_DIR}/packaging/generate-release-notes-page.sh" "${UPDATE_SITE_DIR}/appcast-input/${RELEASE_NOTES_FILENAME}"
 
-UPDATE_CHANNEL=dev \
+# Pull prior signed DMGs from CI artifact cache so generate_appcast can emit delta updates.
+if [[ -n "${PRIOR_RELEASES_DIR:-}" && -d "${PRIOR_RELEASES_DIR}" ]]; then
+  log "seeding appcast-input with prior releases for delta generation"
+  find "${PRIOR_RELEASES_DIR}" -maxdepth 1 -name "${APP_PRODUCT_NAME}-*.dmg" -exec cp {} "${UPDATE_SITE_DIR}/appcast-input/" \;
+fi
+
+UPDATE_CHANNEL="${UPDATE_CHANNEL}" \
 UPDATE_DOWNLOAD_URL_PREFIX="${DOWNLOAD_URL_PREFIX}" \
 UPDATE_RELEASE_NOTES_URL_PREFIX="${PAGES_BASE_URL}/releases/" \
 UPDATE_RELEASE_URL="https://github.com/${REPOSITORY}/releases/tag/${TAG}" \
 SPARKLE_PRIVATE_ED_KEY="${SPARKLE_PRIVATE_ED_KEY}" \
-"${ROOT_DIR}/packaging/generate-sparkle-appcast.sh" "${UPDATE_SITE_DIR}/appcast.xml" "${UPDATE_SITE_DIR}/appcast-input"
+"${ROOT_DIR}/packaging/generate-sparkle-appcast.sh" "${UPDATE_SITE_DIR}/${APPCAST_FILENAME}" "${UPDATE_SITE_DIR}/appcast-input"
 
 cp "${UPDATE_SITE_DIR}/appcast-input/${RELEASE_NOTES_FILENAME}" "${UPDATE_SITE_DIR}/${RELEASE_NOTES_PATH}"
 rm -rf "${UPDATE_SITE_DIR}/appcast-input"
@@ -150,6 +185,8 @@ version=${VERSION}
 build=${BUILD}
 minimum_system_version=${MIN_SYSTEM}
 tag=${TAG}
+update_channel=${UPDATE_CHANNEL}
+appcast_filename=${APPCAST_FILENAME}
 asset_name=${ASSET_NAME}
 pages_base_url=${PAGES_BASE_URL}
 release_notes_filename=${RELEASE_NOTES_FILENAME}

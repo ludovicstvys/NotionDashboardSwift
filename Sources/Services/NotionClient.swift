@@ -54,7 +54,7 @@ struct NotionClient {
   private let diagnostics: DiagnosticsStore?
 
   init(
-    session: URLSession = .shared,
+    session: URLSession = .app,
     maxRetries: Int = 4,
     diagnostics: DiagnosticsStore? = nil
   ) {
@@ -326,7 +326,7 @@ struct NotionClient {
           )
           try await sleep(seconds: delay)
           attempt += 1
-          delay *= 1.8
+          delay *= 1.8 * (1.0 + Double.random(in: 0..<0.2))
           continue
         }
         throw error
@@ -342,7 +342,7 @@ struct NotionClient {
           )
           try await sleep(seconds: delay)
           attempt += 1
-          delay *= 1.8
+          delay *= 1.8 * (1.0 + Double.random(in: 0..<0.2))
           continue
         }
         throw notionError
@@ -413,7 +413,10 @@ struct NotionClient {
     let deadline = propertyDate(props[map.closeDate] as? [String: Any])
     let status = StageStatus.fromNotion(statusRaw, statusMap: config.notionStatusMap)
 
-    let id = (page["id"] as? String) ?? UUID().uuidString
+    guard let id = page["id"] as? String, !id.isEmpty else {
+      log(.warning, category: "notion", message: "parseStage: missing page id, skipping row.")
+      return nil
+    }
     let createdAt = parseISODate(page["created_time"] as? String) ?? Date()
     let updatedAt = parseISODate(page["last_edited_time"] as? String) ?? createdAt
 
@@ -470,8 +473,13 @@ struct NotionClient {
     let notes = propertyText(notesField)
     let relationPageIDs = propertyRelationIDs(relationField)
     let relatedStageID = relationPageIDs.compactMap { stagePageIDToLocalID[$0] }.first ?? ""
-    let pageID = (page["id"] as? String) ?? UUID().uuidString
+    guard let pageID = page["id"] as? String, !pageID.isEmpty else {
+      log(.warning, category: "notion", message: "parseTodo: missing page id, skipping row.")
+      return nil
+    }
     let createdAt = parseISODate(page["created_time"] as? String) ?? Date()
+
+    let notionURL = (page["url"] as? String) ?? ""
 
     return TodoItem(
       id: pageID,
@@ -481,7 +489,8 @@ struct NotionClient {
       notes: notes,
       relatedStageID: relatedStageID,
       automationTag: "notion:\(pageID)",
-      createdAt: createdAt
+      createdAt: createdAt,
+      notionURL: notionURL
     )
   }
 

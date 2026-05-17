@@ -271,6 +271,27 @@ struct TodoItem: Identifiable, Codable, Hashable {
   var relatedStageID: String
   var automationTag: String
   var createdAt: Date
+  var notionURL: String = ""
+
+  // Direct link to the source Notion page. Falls back to constructing a canonical
+  // URL from the stored pageID (parsed out of automationTag or id) when the API
+  // url field is missing — e.g. legacy rows persisted before this field existed.
+  var resolvedNotionURL: String {
+    let trimmed = notionURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty { return trimmed }
+    let candidate: String
+    if automationTag.hasPrefix("notion:") {
+      candidate = String(automationTag.dropFirst("notion:".count))
+    } else {
+      candidate = id
+    }
+    let bare = candidate.replacingOccurrences(of: "-", with: "")
+    let hexCharSet = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+    guard bare.count == 32, bare.unicodeScalars.allSatisfy(hexCharSet.contains) else {
+      return ""
+    }
+    return "https://www.notion.so/\(bare)"
+  }
 }
 
 struct TodoEditorDraft: Hashable {

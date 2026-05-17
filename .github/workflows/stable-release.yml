@@ -1,10 +1,14 @@
-name: Dev Release
+name: Stable Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Marketing version (e.g. 1.2.0)'
+        required: true
 
 permissions:
   contents: write
@@ -12,8 +16,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dev-release-${{ github.ref }}
-  cancel-in-progress: true
+  group: stable-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -37,21 +41,32 @@ jobs:
           brew install xcodegen
           xcodegen --version
 
-      - name: Restore prior dev DMGs for delta generation
+      - name: Determine marketing version
+        id: version
+        run: |
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            ref="${GITHUB_REF##*/}"
+            echo "value=${ref#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore prior stable DMGs for delta generation
         uses: actions/cache@v4
         with:
           path: /tmp/NotionDashboardPriorReleases
-          key: prior-releases-dev-${{ github.run_id }}
+          key: prior-releases-stable-${{ github.run_id }}
           restore-keys: |
-            prior-releases-dev-
+            prior-releases-stable-
 
       - name: Build, sign, notarize, and generate appcast
         env:
           CURRENT_PROJECT_VERSION_OVERRIDE: ${{ github.run_number }}
+          MARKETING_VERSION_OVERRIDE: ${{ steps.version.outputs.value }}
           DERIVED_DATA_PATH: /tmp/NotionDashboardDerivedData
           APP_PRODUCT_NAME: Dashboard
           PRESERVE_BUILD_LOG: "1"
-          UPDATE_CHANNEL: dev
+          UPDATE_CHANNEL: stable
           PRIOR_RELEASES_DIR: /tmp/NotionDashboardPriorReleases
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
@@ -69,7 +84,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-dmg-logs
+          name: build-dmg-logs-stable
           path: /tmp/notion-dashboard-build.*.log
           if-no-files-found: ignore
 
@@ -82,28 +97,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.metadata.outputs.tag }}
-          name: Dev build ${{ steps.metadata.outputs.version }} (${{ steps.metadata.outputs.build }})
-          prerelease: true
-          make_latest: false
+          name: Dashboard ${{ steps.metadata.outputs.version }}
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           files: ${{ steps.metadata.outputs.release_assets_dir }}/${{ steps.metadata.outputs.asset_name }}
           fail_on_unmatched_files: true
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      # Stable workflow does NOT auto-deploy Pages to avoid stomping the dev appcast.xml.
+      # The appcast-stable.xml lives at build/update-site; merge into the Pages branch manually
+      # or via a follow-up workflow that fetches the live appcast.xml and combines both files
+      # before deploying.
+      - name: Upload appcast-stable artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: ${{ steps.metadata.outputs.update_site_dir }}
-
-  deploy-pages:
-    needs: publish
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: appcast-stable
+          path: build/update-site

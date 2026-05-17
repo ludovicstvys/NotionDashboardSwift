@@ -12,13 +12,22 @@ enum AppSupportDirectory {
       let directoryURL = homeURL
         .appendingPathComponent("Library/Application Support", isDirectory: true)
         .appendingPathComponent(folderName, isDirectory: true)
-      try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+      do {
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+      } catch {
+        NSLog("AppSupportDirectory: createDirectory failed at \(directoryURL.path): \(error)")
+      }
       return directoryURL
     }
 #endif
-    let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+    let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+      ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
     let directoryURL = baseURL.appendingPathComponent(folderName, isDirectory: true)
-    try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    do {
+      try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    } catch {
+      NSLog("AppSupportDirectory: createDirectory failed at \(directoryURL.path): \(error)")
+    }
     return directoryURL
   }
 
@@ -64,3 +73,14 @@ private var realHomeURL: URL? {
   return URL(fileURLWithPath: String(cString: homePointer), isDirectory: true)
 }
 #endif
+
+extension URLSession {
+  static let app: URLSession = {
+    let config = URLSessionConfiguration.default
+    config.timeoutIntervalForRequest = 30
+    config.timeoutIntervalForResource = 60
+    config.waitsForConnectivity = true
+    config.requestCachePolicy = .reloadIgnoringLocalCacheData
+    return URLSession(configuration: config)
+  }()
+}

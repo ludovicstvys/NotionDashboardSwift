@@ -47,7 +47,7 @@ struct PipelineImportService {
       "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
       forHTTPHeaderField: "User-Agent"
     )
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await URLSession.app.data(for: request)
     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
       throw PipelineImportError.fetchFailed
     }
